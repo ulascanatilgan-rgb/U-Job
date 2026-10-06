@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f7f5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="U-Job">
+  <title>U-Job</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg?v=1" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg?v=1">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-mode="reasonable">
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">U-Job</div>
+      <div id="lastUpdate" class="last-update">Not run yet</div>
+    </header>
+
+    <nav class="modes" aria-label="Job search modes">
+      <button class="mode reasonable active" data-mode="reasonable">Reasonable</button>
+      <button class="mode creative" data-mode="creative">Creative</button>
+      <button class="mode corporate" data-mode="corporate">Corporate</button>
+      <button class="mode politics" data-mode="politics">Politics</button>
+    </nav>
+
+    <section class="control-row">
+      <div>
+        <h1 id="sectionTitle">Reasonable</h1>
+        <p id="sectionHint">Balanced, dynamic next step.</p>
+      </div>
+      <button id="runButton" class="run">Run</button>
+    </section>
+
+    <div id="status" class="status" aria-live="polite"></div>
+    <section id="results" class="results"></section>
+
+    <section class="history-wrap">
+      <button id="historyToggle" class="history-toggle" aria-expanded="false">
+        <span>History</span>
+        <span id="historyCount">0</span>
+      </button>
+      <div id="history" class="history" hidden></div>
+    </section>
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
