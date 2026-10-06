@@ -9,7 +9,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = "gpt-5.6-sol";
+const OPENAI_MODEL = "gpt-5.6-luna";
 
 const MODES = {
   reasonable: {
@@ -199,20 +199,7 @@ async function callSearch(prompt) {
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      tools: [{
-        type: "web_search",
-        search_context_size: "high",
-        user_location: {
-          type: "approximate",
-          country: "BE",
-          city: "Antwerp",
-          region: "Flanders"
-        }
-      }],
-      tool_choice: "required",
-      include: ["web_search_call.action.sources"],
-      reasoning: { effort: "medium" },
-      text: { format: { type: "json_object" } },
+      tools: [{ type: "web_search" }],
       input: prompt,
       max_output_tokens: 4200
     })
@@ -220,12 +207,16 @@ async function callSearch(prompt) {
 
   if (!response.ok) {
     const raw = await response.text();
-    console.error("OpenAI API error", response.status, raw.slice(0, 1000));
-    let error = `OpenAI API error (${response.status}).`;
+    console.error("OpenAI API error", response.status, raw.slice(0, 1200));
+    let detail = "";
+    try {
+      const parsedError = JSON.parse(raw);
+      detail = parsedError?.error?.message ? String(parsedError.error.message) : "";
+    } catch {}
+    let error = detail || `OpenAI API error (${response.status}).`;
     if (response.status === 401) error = "OpenAI API key is invalid or rejected.";
-    else if (response.status === 403) error = "This OpenAI API key/project does not have access.";
-    else if (response.status === 404) error = `Model '${OPENAI_MODEL}' is not available to this API project.`;
-    else if (response.status === 429) error = "OpenAI API billing/quota limit reached.";
+    else if (response.status === 403) error = detail || "This OpenAI API key/project does not have access.";
+    else if (response.status === 429) error = detail || "OpenAI API billing/quota limit reached.";
     const e = new Error(error);
     e.status = 502;
     throw e;
