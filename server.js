@@ -9,7 +9,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-6-luna";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-6-sol";
 
 const MODES = {
   reasonable: {
@@ -169,7 +169,7 @@ GEOGRAPHY: ${cfg.geography}
 Search the live web and return up to 5 genuinely strong OPEN vacancies.
 
 STRICT RULES:
-1. FRESHNESS: prioritise vacancies posted in the last 72 hours. Normally reject anything older than 7 calendar days. Do not invent a posting date.
+1. FRESHNESS: prioritise vacancies posted in the last 72 hours, then the last 7 days. Prefer a verified posting/update date. If the official vacancy is clearly live and accepting applications but no public posting date is shown, it may still be included and publishedDate should be "Live — date not shown".
 2. OPEN STATUS: inspect the actual vacancy/application page and reject closed, expired, removed or archived listings.
 3. LANGUAGE: double-check the actual requirements. English must be sufficient. Reject roles where fluent/professional Dutch or French is mandatory. At most one exceptional >=9.5/10 role may be included if Dutch/French is explicitly only preferred/asset, never mandatory.
 4. LINK: return the direct official employer/ATS application URL whenever possible. Avoid generic home pages and search pages.
@@ -178,7 +178,7 @@ STRICT RULES:
 7. DUPLICATES: do not return a previously shown role, equivalent role, or already-seen URL.
 8. SCORE: rate candidate fit 0.0–10.0. Be strict; 9+ should be rare. Sort highest score first.
 9. WHY FIT: exactly 3 short, specific sentences.
-10. If only 2 or 3 roles pass, return only 2 or 3. Quality is more important than returning 5.
+10. Aim for 5 results, but never fabricate. If fewer than 5 strong matches exist in the preferred geography, widen geographically within Belgium before weakening role fit or language requirements.
 
 PREVIOUSLY SHOWN ROLES:
 ${PRIOR_SHOWN.join("\n")}
@@ -190,14 +190,7 @@ Return ONLY JSON:
 {"jobs":[{"title":"Role","company":"Company","location":"City","url":"https://direct-application-url","publishedDate":"YYYY-MM-DD","languageCheck":"English sufficient; Dutch/French not mandatory.","score":8.7,"whyFit":["Short sentence 1.","Short sentence 2.","Short sentence 3."]}]}`;
 }
 
-async function searchJobs(req, res) {
-  if (!OPENAI_API_KEY) return sendJson(res, 503, { error: "OPENAI_API_KEY is not configured in Railway." });
-
-  const body = await readJson(req);
-  const mode = String(body.mode || "");
-  if (!MODES[mode]) return sendJson(res, 400, { error: "Unknown search mode." });
-  const seenUrls = Array.isArray(body.seenUrls) ? body.seenUrls.map(String) : [];
-
+async function callSearch(prompt) {
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -208,8 +201,8 @@ async function searchJobs(req, res) {
       model: OPENAI_MODEL,
       tools: [{ type: "web_search" }],
       tool_choice: "auto",
-      input: promptFor(mode, seenUrls),
-      max_output_tokens: 3200
+      input: prompt,
+      max_output_tokens: 4200
     })
   });
 
@@ -221,32 +214,76 @@ async function searchJobs(req, res) {
     else if (response.status === 403) error = "This OpenAI API key/project does not have access.";
     else if (response.status === 404) error = `Model '${OPENAI_MODEL}' is not available to this API project.`;
     else if (response.status === 429) error = "OpenAI API billing/quota limit reached.";
-    return sendJson(res, 502, { error });
+    const e = new Error(error);
+    e.status = 502;
+    throw e;
   }
 
   const data = await response.json();
-  const parsed = parseJson(extractText(data));
+  return parseJson(extractText(data));
+}
+
+function finaliseJobs(rawJobs, seenUrls, existing = []) {
   const excluded = new Set(seenUrls.map(normaliseUrl));
-  const dedupe = new Set();
+  const dedupe = new Set(existing.map(j => `${j.company.toLowerCase()}|${j.title.toLowerCase()}`));
+  const out = [...existing];
 
-  const jobs = (Array.isArray(parsed.jobs) ? parsed.jobs : [])
-    .map(cleanJob)
-    .filter(j => j.title && j.company && /^https?:\/\//i.test(j.url))
-    .filter(j => !excluded.has(j.url))
-    .filter(j => {
-      const key = `${j.company.toLowerCase()}|${j.title.toLowerCase()}`;
-      if (dedupe.has(key)) return false;
-      dedupe.add(key);
-      return true;
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+  for (const raw of Array.isArray(rawJobs) ? rawJobs : []) {
+    const j = cleanJob(raw);
+    if (!j.title || !j.company || !/^https?:\/\//i.test(j.url)) continue;
+    if (excluded.has(j.url)) continue;
+    const key = `${j.company.toLowerCase()}|${j.title.toLowerCase()}`;
+    if (dedupe.has(key)) continue;
+    dedupe.add(key);
+    out.push(j);
+    if (out.length >= 5) break;
+  }
 
-  sendJson(res, 200, {
-    jobs,
-    searchedAt: new Date().toISOString(),
-    model: OPENAI_MODEL
-  });
+  return out.sort((a, b) => b.score - a.score).slice(0, 5);
+}
+
+function fallbackPrompt(mode, seenUrls, currentJobs) {
+  return promptFor(mode, seenUrls) + `
+
+FALLBACK PASS:
+The strict first pass found too few results. Search again, using different queries and sources.
+- Keep English-sufficient and open-status rules strict.
+- Keep direct application links strict.
+- Expand freshness to the last 14 days first, and only if necessary up to 21 days.
+- Search official company career pages plus Greenhouse, Lever, Workday, SmartRecruiters, EuroBrussels, Euractiv Jobs, LinkedIn Jobs and relevant Belgian/international sector job boards.
+- For Reasonable and Creative, search Antwerp/Kapellen/Brasschaat first, then Mechelen/Brussels/Belgium if needed.
+- For Corporate and Politics, Brussels and wider Belgium are fully acceptable.
+- Do NOT repeat these already selected roles: ${currentJobs.map(j => `${j.company} — ${j.title}`).join("; ") || "None"}.
+Return only additional strong matches in the same JSON format.`;
+}
+
+async function searchJobs(req, res) {
+  if (!OPENAI_API_KEY) return sendJson(res, 503, { error: "OPENAI_API_KEY is not configured in Railway." });
+
+  const body = await readJson(req);
+  const mode = String(body.mode || "");
+  if (!MODES[mode]) return sendJson(res, 400, { error: "Unknown search mode." });
+  const seenUrls = Array.isArray(body.seenUrls) ? body.seenUrls.map(String) : [];
+
+  try {
+    const first = await callSearch(promptFor(mode, seenUrls));
+    let jobs = finaliseJobs(first.jobs, seenUrls);
+
+    if (jobs.length < 4) {
+      const second = await callSearch(fallbackPrompt(mode, seenUrls, jobs));
+      jobs = finaliseJobs(second.jobs, seenUrls, jobs);
+    }
+
+    sendJson(res, 200, {
+      jobs,
+      searchedAt: new Date().toISOString(),
+      model: OPENAI_MODEL,
+      searchPasses: jobs.length < 4 ? 2 : 1
+    });
+  } catch (error) {
+    console.error(error);
+    return sendJson(res, error.status || 500, { error: error.message || "Search failed." });
+  }
 }
 
 async function serveStatic(req, res, pathname) {
