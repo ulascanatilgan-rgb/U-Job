@@ -9,8 +9,8 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = "gpt-6-luna";
-const APP_VERSION = "2.0.0-clean";
+const OPENAI_MODEL = "gpt-5.6-luna";
+const APP_VERSION = "2.0.1-api-fix";
 
 const MODES = {
   reasonable: {
@@ -205,9 +205,21 @@ async function callOpenAI(prompt) {
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      tools: [{ type: "web_search" }],
+      tools: [{
+        type: "web_search",
+        search_context_size: "high",
+        user_location: {
+          type: "approximate",
+          country: "BE",
+          city: "Antwerp",
+          region: "Flanders",
+          timezone: "Europe/Brussels"
+        }
+      }],
       tool_choice: "required",
-      include: ["web_search_call.action.sources"],
+      text: {
+        format: { type: "json_object" }
+      },
       input: prompt,
       max_output_tokens: 5000
     })
@@ -230,16 +242,13 @@ async function callOpenAI(prompt) {
   const data = JSON.parse(raw);
   const outputText = extractOutputText(data);
   const webSearchCalls = (data.output || []).filter(item => item?.type === "web_search_call").length;
-  const sources = (data.output || [])
-    .filter(item => item?.type === "web_search_call")
-    .flatMap(item => Array.isArray(item?.action?.sources) ? item.action.sources : []);
-
   return {
     parsed: parseJsonObject(outputText),
     diagnostics: {
       webSearchCalls,
-      sourceCount: sources.length,
-      responseId: data.id || null
+      responseId: data.id || null,
+      responseStatus: data.status || null,
+      outputTextLength: outputText.length
     }
   };
 }
