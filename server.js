@@ -10,6 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
+const APP_VERSION = "2026-10-06-debug1";
 
 const MODES = {
   reasonable: {
@@ -338,7 +339,10 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 200, {
         ok: true,
         configured: Boolean(OPENAI_API_KEY),
-        model: OPENAI_MODEL
+        model: OPENAI_MODEL,
+        appVersion: APP_VERSION,
+        railwayService: process.env.RAILWAY_SERVICE_NAME || null,
+        railwayCommit: process.env.RAILWAY_GIT_COMMIT_SHA || null
       });
     }
 
