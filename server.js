@@ -211,6 +211,8 @@ async function callSearch(prompt) {
       }],
       tool_choice: "required",
       include: ["web_search_call.action.sources"],
+      reasoning: { effort: "medium" },
+      text: { format: { type: "json_object" } },
       input: prompt,
       max_output_tokens: 4200
     })
