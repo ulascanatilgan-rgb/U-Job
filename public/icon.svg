@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#6b4630"/>
-  <text x="256" y="230" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif" font-size="150" font-weight="700" fill="#ffffff">U</text>
-  <rect x="116" y="270" width="280" height="80" rx="40" fill="#9b6a49"/>
-  <text x="256" y="326" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif" font-size="54" font-weight="700" letter-spacing="2" fill="#ffffff">JOB</text>
+  <rect width="512" height="512" rx="112" fill="#6B4630"/>
+  <text x="256" y="228" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif" font-size="148" font-weight="700" fill="#FFFFFF">U</text>
+  <rect x="112" y="270" width="288" height="82" rx="41" fill="#9A6846"/>
+  <text x="256" y="327" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif" font-size="54" font-weight="700" letter-spacing="2" fill="#FFFFFF">JOB</text>
 </svg>
