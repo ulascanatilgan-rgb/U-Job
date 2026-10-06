@@ -9,7 +9,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-6-sol";
+const OPENAI_MODEL = "gpt-5.6-sol";
 
 const MODES = {
   reasonable: {
