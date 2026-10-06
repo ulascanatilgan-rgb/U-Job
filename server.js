@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "2.2.0-fast-verified";
+const APP_VERSION = "2.2.1-stable-search";
 
 const MODES = {
   reasonable: {
@@ -175,7 +175,7 @@ GEOGRAPHY:
 ${cfg.geography}
 
 RULES:
-1. Find up to 8 promising vacancies, but return only those that pass final live verification.
+1. Find up to 5 promising vacancies, but return only those that pass final live verification.
 2. HARD FRESHNESS RULE: only consider vacancies with a publication/posting date within the last 7 calendar days. Prefer the last 72 hours. NEVER widen beyond 7 days.
 3. A precise publication date is mandatory. Verify it from the live vacancy/ATS page, employer page metadata, or another credible current source. If you cannot establish YYYY-MM-DD, exclude it.
 4. The vacancy must appear currently open and accepting applications. Ignore cached, indexed, archived, expired, removed, filled, or "job no longer available" pages.
@@ -293,7 +293,7 @@ If nothing passes all checks, output exactly: NO_VERIFIED_JOBS
 `;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 90000);
+  const timeout = setTimeout(() => controller.abort(), 60000);
 
   let response;
   try {
@@ -305,7 +305,7 @@ If nothing passes all checks, output exactly: NO_VERIFIED_JOBS
         model: OPENAI_MODEL,
         tools: [{
           type: "web_search",
-          search_context_size: "high",
+          search_context_size: "medium",
           user_location: {
             type: "approximate",
             country: "BE",
@@ -316,7 +316,7 @@ If nothing passes all checks, output exactly: NO_VERIFIED_JOBS
         }],
         tool_choice: "required",
         input: strictPrompt,
-        max_output_tokens: 6500
+        max_output_tokens: 4200
       })
     });
   } catch (error) {
