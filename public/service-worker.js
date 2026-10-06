@@ -1,5 +1,5 @@
-const CACHE="u-job-v21";
-const ASSETS=["/","/styles.css?v=21","/app.js?v=21","/manifest.webmanifest?v=21","/icon.svg?v=21"];
+const CACHE="u-job-v22";
+const ASSETS=["/","/styles.css?v=22","/app.js?v=22","/manifest.webmanifest?v=22","/icon.svg?v=22"];
 self.addEventListener("install",event=>{
   self.skipWaiting();
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));
