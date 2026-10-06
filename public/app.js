@@ -175,7 +175,9 @@ async function runSearch() {
 
     els.status.textContent = jobs.length
       ? `${jobs.length} verified match${jobs.length === 1 ? "" : "es"}.`
-      : "No vacancy passed all checks.";
+      : (data?.diagnostics?.webSearchCalls
+          ? `Live web search ran (${data.diagnostics.webSearchCalls} search call${data.diagnostics.webSearchCalls === 1 ? "" : "s"}), but no vacancy passed all checks.`
+          : "No live web search was executed. Please redeploy the latest GitHub version.");
 
     render();
   } catch (error) {
