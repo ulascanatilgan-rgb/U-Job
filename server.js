@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "2.1.0-strict-freshness";
+const APP_VERSION = "2.2.0-fast-verified";
 
 const MODES = {
   reasonable: {
@@ -175,9 +175,9 @@ GEOGRAPHY:
 ${cfg.geography}
 
 RULES:
-1. Discovery pass only: find up to 12 promising candidate vacancies so a separate verification pass can check them.
+1. Find up to 8 promising vacancies, but return only those that pass final live verification.
 2. HARD FRESHNESS RULE: only consider vacancies with a publication/posting date within the last 7 calendar days. Prefer the last 72 hours. NEVER widen beyond 7 days.
-3. A precise publication date is mandatory. If you cannot establish a credible YYYY-MM-DD publication date from the vacancy page, ATS metadata, employer page, or reliable current search result, exclude it.
+3. A precise publication date is mandatory. Verify it from the live vacancy/ATS page, employer page metadata, or another credible current source. If you cannot establish YYYY-MM-DD, exclude it.
 4. The vacancy must appear currently open and accepting applications. Ignore cached, indexed, archived, expired, removed, filled, or "job no longer available" pages.
 5. English must be sufficient. Reject jobs that explicitly require fluent/professional Dutch or French. One exceptional role may be included only if local language is clearly optional/preferred.
 6. Strongly prefer the employer's official career page or active ATS direct application page. Do not use generic career homepages, search-result pages, stale aggregators, or copied listings when the original vacancy is unavailable.
@@ -200,6 +200,45 @@ Do not use markdown tables.
 Do not invent any missing field; write "unknown" when verification is not possible.`;
 }
 
+function parseVerifiedJobs(text) {
+  const blocks = String(text || "").split("---JOB---").slice(1);
+  const jobs = [];
+
+  for (const block of blocks) {
+    const fields = {};
+    for (const rawLine of block.split("\n")) {
+      const line = rawLine.trim();
+      const i = line.indexOf(":");
+      if (i <= 0) continue;
+      const key = line.slice(0, i).trim().toUpperCase();
+      const value = line.slice(i + 1).trim();
+      fields[key] = value;
+    }
+
+    if (String(fields.VERIFIED_OPEN || "").toUpperCase() !== "YES") continue;
+
+    const score = Number(fields.SCORE);
+    const whyFit = [
+      fields.WHY_FIT_1,
+      fields.WHY_FIT_2,
+      fields.WHY_FIT_3
+    ].map(v => String(v || "").trim()).filter(Boolean);
+
+    jobs.push({
+      title: fields.TITLE || "",
+      company: fields.COMPANY || "",
+      location: fields.LOCATION || "",
+      url: fields.DIRECT_URL || "",
+      publishedDate: fields.PUBLISHED_DATE || "",
+      languageCheck: fields.LANGUAGE_CHECK || "",
+      score: Number.isFinite(score) ? score : 0,
+      whyFit
+    });
+  }
+
+  return { jobs };
+}
+
 async function callOpenAI(prompt) {
   const headers = {
     "Authorization": `Bearer ${OPENAI_API_KEY}`,
@@ -213,204 +252,120 @@ async function callOpenAI(prompt) {
     day: "2-digit"
   }).format(new Date());
 
-  // Stage 1: discover recent candidates.
-  const searchResponse = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      tools: [{
-        type: "web_search",
-        search_context_size: "high",
-        user_location: {
-          type: "approximate",
-          country: "BE",
-          city: "Antwerp",
-          region: "Flanders",
-          timezone: "Europe/Brussels"
-        }
-      }],
-      tool_choice: "required",
-      input: prompt,
-      max_output_tokens: 7000
-    })
-  });
+  const strictPrompt = `${prompt}
 
-  const searchRaw = await searchResponse.text();
-  if (!searchResponse.ok) {
-    let detail = "";
-    try {
-      const parsed = JSON.parse(searchRaw);
-      detail = parsed?.error?.message ? String(parsed.error.message) : "";
-    } catch {}
-    const error = new Error(detail || `OpenAI discovery error (${searchResponse.status}).`);
-    error.httpStatus = searchResponse.status;
-    throw error;
-  }
+FINAL VERIFICATION MUST HAPPEN IN THIS SAME LIVE WEB SEARCH RUN.
 
-  const searchData = JSON.parse(searchRaw);
-  const discoveryText = extractOutputText(searchData);
-  const discoveryCalls = (searchData.output || []).filter(item => item?.type === "web_search_call").length;
+Today is ${today} in Belgium.
 
-  if (!discoveryText) {
-    throw new Error("Live discovery search completed but returned no vacancy research.");
-  }
+Before returning ANY vacancy:
+- Open/check the exact current vacancy or ATS page.
+- Confirm the specific job is still live and accepting applications now.
+- Confirm an exact publication/posting date from a credible source.
+- Publication date MUST be within the last 7 calendar days.
+- If exact date cannot be established, REJECT the vacancy.
+- If the page is unavailable, expired, archived, removed, 404, redirects to a generic careers page, or says no longer accepting applications, REJECT it.
+- If the employer/ATS vacancy is dead, do not substitute an aggregator copy.
+- Mandatory fluent/professional Dutch or French means REJECT.
+- Never include an old vacancy just to reach five results.
+- 0 to 5 results is acceptable. Freshness and live status are more important than quantity.
 
-  // Stage 2: independently re-check dates and live application status.
-  const verificationPrompt = `You are the strict verification stage for a job-search app.
-Today in Belgium is ${today}.
+OUTPUT FORMAT:
+Return plain text only. For each accepted vacancy use exactly this block:
 
-Below is a discovery dossier containing candidate vacancies. VERIFY EACH CANDIDATE AGAIN USING LIVE WEB SEARCH.
-
-HARD ACCEPTANCE TEST — all conditions must pass:
-1. PUBLICATION DATE: establish an exact YYYY-MM-DD posting/publication date. The date must be within the last 7 calendar days relative to ${today}. If the date is missing, ambiguous, only says "recently", cannot be credibly established, or is older than 7 days: REJECT.
-2. LIVE STATUS: open the exact vacancy/application page or locate its current official employer/ATS page. It must still show the specific role and allow an application now. If it says unavailable, expired, closed, filled, no longer accepting applications, 404, redirects to a generic careers page, or only survives on an aggregator/cache: REJECT.
-3. DIRECT LINK: retain only a live direct employer/ATS vacancy URL whenever available. If the original vacancy is dead, do not substitute an old copied listing.
-4. LANGUAGE: English must be sufficient. Mandatory fluent/professional Dutch or French means REJECT, unless the local language is explicitly optional/preferred only.
-5. FIT: reject obvious major must-have gaps.
-
-Do not try to reach five results. Accuracy is more important than quantity. Returning 0, 1, 2 or 3 is acceptable.
-
-For every ACCEPTED vacancy output exactly:
+---JOB---
 VERIFIED_OPEN: YES
-TITLE:
-COMPANY:
-LOCATION:
-DIRECT_URL:
+TITLE: ...
+COMPANY: ...
+LOCATION: ...
+DIRECT_URL: https://...
 PUBLISHED_DATE: YYYY-MM-DD
-LANGUAGE_CHECK:
-SCORE:
-WHY_FIT_1:
-WHY_FIT_2:
-WHY_FIT_3:
-VERIFICATION_NOTE: one short sentence confirming where/date/open status were verified.
+LANGUAGE_CHECK: ...
+SCORE: 8.7
+WHY_FIT_1: ...
+WHY_FIT_2: ...
+WHY_FIT_3: ...
 
-Do not output rejected vacancies except as a short count at the end.
-Do not invent or infer a date merely from how fresh a search result looks.
+Do not output rejected vacancies.
+Do not use markdown tables.
+Do not output "date not shown", "unknown", relative dates, or guessed dates.
+If nothing passes all checks, output exactly: NO_VERIFIED_JOBS
+`;
 
-DISCOVERY DOSSIER:
-${discoveryText}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90000);
 
-  const verifyResponse = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      tools: [{
-        type: "web_search",
-        search_context_size: "high",
-        user_location: {
-          type: "approximate",
-          country: "BE",
-          city: "Antwerp",
-          region: "Flanders",
-          timezone: "Europe/Brussels"
-        }
-      }],
-      tool_choice: "required",
-      input: verificationPrompt,
-      max_output_tokens: 7000
-    })
-  });
+  let response;
+  try {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        tools: [{
+          type: "web_search",
+          search_context_size: "high",
+          user_location: {
+            type: "approximate",
+            country: "BE",
+            city: "Antwerp",
+            region: "Flanders",
+            timezone: "Europe/Brussels"
+          }
+        }],
+        tool_choice: "required",
+        input: strictPrompt,
+        max_output_tokens: 6500
+      })
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      const e = new Error("Live search timed out. Please run it again.");
+      e.httpStatus = 504;
+      throw e;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 
-  const verifyRaw = await verifyResponse.text();
-  if (!verifyResponse.ok) {
+  const raw = await response.text();
+
+  if (!response.ok) {
     let detail = "";
     try {
-      const parsed = JSON.parse(verifyRaw);
+      const parsed = JSON.parse(raw);
       detail = parsed?.error?.message ? String(parsed.error.message) : "";
     } catch {}
-    const error = new Error(detail || `OpenAI verification error (${verifyResponse.status}).`);
-    error.httpStatus = verifyResponse.status;
+    const error = new Error(detail || `OpenAI web-search error (${response.status}).`);
+    error.httpStatus = response.status;
     throw error;
   }
 
-  const verifyData = JSON.parse(verifyRaw);
-  const verifiedText = extractOutputText(verifyData);
-  const verificationCalls = (verifyData.output || []).filter(item => item?.type === "web_search_call").length;
+  const data = JSON.parse(raw);
+  const outputText = extractOutputText(data);
+  const webSearchCalls = (data.output || []).filter(item => item?.type === "web_search_call").length;
 
-  if (!verifiedText) {
-    throw new Error("Verification search completed but returned no verification text.");
+  if (!outputText) {
+    throw new Error("Live web search completed but returned no vacancy text.");
   }
 
-  // Stage 3: format only the independently verified vacancies.
-  const formatPrompt = `Convert ONLY the VERIFIED_OPEN: YES vacancies below into one JSON object.
-
-Return exactly this shape:
-{"jobs":[{"title":"Role title","company":"Company","location":"City","url":"https://direct-link","publishedDate":"YYYY-MM-DD","languageCheck":"English sufficient; Dutch/French not mandatory.","score":8.7,"whyFit":["Sentence one.","Sentence two.","Sentence three."]}]}
-
-STRICT RULES:
-- Maximum 5 jobs.
-- Include only entries explicitly marked VERIFIED_OPEN: YES.
-- publishedDate MUST be an exact YYYY-MM-DD date. Never output "date not shown", "unknown", relative dates or blanks.
-- Never invent, repair or substitute a URL.
-- Exclude any item without a full http/https direct vacancy URL.
-- Keep score numeric from 0 to 10.
-- whyFit must contain exactly 3 short sentences.
-- If no vacancy survived verification, return {"jobs":[]}.
-- Return JSON only.
-
-VERIFIED VACANCIES:
-${verifiedText}`;
-
-  const formatResponse = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      text: { format: { type: "json_object" } },
-      input: formatPrompt,
-      max_output_tokens: 3500
-    })
-  });
-
-  const formatRaw = await formatResponse.text();
-  if (!formatResponse.ok) {
-    let detail = "";
-    try {
-      const parsed = JSON.parse(formatRaw);
-      detail = parsed?.error?.message ? String(parsed.error.message) : "";
-    } catch {}
-    const error = new Error(detail || `OpenAI formatting error (${formatResponse.status}).`);
-    error.httpStatus = formatResponse.status;
-    throw error;
-  }
-
-  const formatData = JSON.parse(formatRaw);
-  const jsonText = extractOutputText(formatData);
+  const parsed = outputText.includes("NO_VERIFIED_JOBS")
+    ? { jobs: [] }
+    : parseVerifiedJobs(outputText);
 
   return {
-    parsed: parseJsonObject(jsonText),
+    parsed,
     diagnostics: {
-      webSearchCalls: discoveryCalls + verificationCalls,
-      discoveryCalls,
-      verificationCalls,
-      discoveryResponseId: searchData.id || null,
-      verificationResponseId: verifyData.id || null,
-      formatResponseId: formatData.id || null,
-      discoveryTextLength: discoveryText.length,
-      verifiedTextLength: verifiedText.length,
-      jsonTextLength: jsonText.length
+      webSearchCalls,
+      responseId: data.id || null,
+      responseStatus: data.status || null,
+      outputTextLength: outputText.length
     }
   };
 }
 
-function isFreshPublishedDate(value) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return false;
-  const published = new Date(`${value}T12:00:00+02:00`);
-  if (Number.isNaN(published.getTime())) return false;
-
-  const nowParts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Brussels",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).format(new Date());
-  const today = new Date(`${nowParts}T12:00:00+02:00`);
-  const ageDays = (today.getTime() - published.getTime()) / 86400000;
-
-  return ageDays >= 0 && ageDays <= 7;
-}
 
 async function searchJobs(req, res) {
   if (!OPENAI_API_KEY) {
@@ -430,7 +385,7 @@ async function searchJobs(req, res) {
 
     const jobs = (Array.isArray(result.parsed?.jobs) ? result.parsed.jobs : [])
       .map(cleanJob)
-      .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url))
+      .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url) && job.whyFit.length === 3)
       .filter(job => isFreshPublishedDate(job.publishedDate))
       .filter(job => !excluded.has(job.url))
       .filter(job => {
