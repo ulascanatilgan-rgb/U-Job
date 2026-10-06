@@ -1,0 +1,17 @@
+{
+  "name": "U-Job",
+  "short_name": "U-Job",
+  "description": "Personal job search dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f7f5",
+  "theme_color": "#7a5236",
+  "icons": [
+    {
+      "src": "/icon.svg?v=1",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
