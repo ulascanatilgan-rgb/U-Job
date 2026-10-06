@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "2.0.1-api-fix";
+const APP_VERSION = "2.0.2-two-stage-search";
 
 const MODES = {
   reasonable: {
@@ -192,17 +192,24 @@ ${NEVER_REPEAT.join("\n")}
 ALREADY SEEN URLS:
 ${seen.length ? seen.join("\n") : "None"}
 
-After completing the web research, return ONLY one JSON object and no markdown:
-{"jobs":[{"title":"Role title","company":"Company","location":"City","url":"https://direct-link","publishedDate":"YYYY-MM-DD or Live — date not shown","languageCheck":"English sufficient; Dutch/French not mandatory.","score":8.7,"whyFit":["Sentence one.","Sentence two.","Sentence three."]}]}`;
+After completing the web research, return a concise vacancy dossier.
+For each vacancy include these exact fields on separate lines:
+TITLE, COMPANY, LOCATION, DIRECT_URL, PUBLISHED_DATE, LANGUAGE_CHECK, SCORE, WHY_FIT_1, WHY_FIT_2, WHY_FIT_3.
+Always write the full direct URL explicitly as plain text.
+Do not use markdown tables.
+Do not invent any missing field; write "unknown" when verification is not possible.`;
 }
 
 async function callOpenAI(prompt) {
-  const response = await fetch("https://api.openai.com/v1/responses", {
+  const headers = {
+    "Authorization": `Bearer ${OPENAI_API_KEY}`,
+    "Content-Type": "application/json"
+  };
+
+  // Stage 1: live web research. JSON mode cannot be combined with web_search.
+  const searchResponse = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
+    headers,
     body: JSON.stringify({
       model: OPENAI_MODEL,
       tools: [{
@@ -217,38 +224,85 @@ async function callOpenAI(prompt) {
         }
       }],
       tool_choice: "required",
-      text: {
-        format: { type: "json_object" }
-      },
       input: prompt,
-      max_output_tokens: 5000
+      max_output_tokens: 6000
     })
   });
 
-  const raw = await response.text();
-
-  if (!response.ok) {
+  const searchRaw = await searchResponse.text();
+  if (!searchResponse.ok) {
     let detail = "";
     try {
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(searchRaw);
       detail = parsed?.error?.message ? String(parsed.error.message) : "";
     } catch {}
-    const message = detail || `OpenAI API error (${response.status}).`;
-    const error = new Error(message);
-    error.httpStatus = response.status;
+    const error = new Error(detail || `OpenAI web-search error (${searchResponse.status}).`);
+    error.httpStatus = searchResponse.status;
     throw error;
   }
 
-  const data = JSON.parse(raw);
-  const outputText = extractOutputText(data);
-  const webSearchCalls = (data.output || []).filter(item => item?.type === "web_search_call").length;
+  const searchData = JSON.parse(searchRaw);
+  const researchText = extractOutputText(searchData);
+  const webSearchCalls = (searchData.output || []).filter(item => item?.type === "web_search_call").length;
+
+  if (!researchText) {
+    throw new Error("Live web search completed but returned no research text.");
+  }
+
+  // Stage 2: convert the researched vacancies to predictable JSON.
+  const formatPrompt = `Convert the vacancy research below into one JSON object.
+
+Return exactly this shape:
+{"jobs":[{"title":"Role title","company":"Company","location":"City","url":"https://direct-link","publishedDate":"YYYY-MM-DD or Live — date not shown","languageCheck":"English sufficient; Dutch/French not mandatory.","score":8.7,"whyFit":["Sentence one.","Sentence two.","Sentence three."]}]}
+
+Rules:
+- Maximum 5 jobs.
+- Preserve only vacancies present in the research.
+- Never invent or repair a URL.
+- Exclude any item without a full http/https URL.
+- Keep score numeric from 0 to 10.
+- whyFit must contain exactly 3 short sentences.
+- Return JSON only.
+
+VACANCY RESEARCH:
+${researchText}`;
+
+  const formatResponse = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      text: {
+        format: { type: "json_object" }
+      },
+      input: formatPrompt,
+      max_output_tokens: 3500
+    })
+  });
+
+  const formatRaw = await formatResponse.text();
+  if (!formatResponse.ok) {
+    let detail = "";
+    try {
+      const parsed = JSON.parse(formatRaw);
+      detail = parsed?.error?.message ? String(parsed.error.message) : "";
+    } catch {}
+    const error = new Error(detail || `OpenAI formatting error (${formatResponse.status}).`);
+    error.httpStatus = formatResponse.status;
+    throw error;
+  }
+
+  const formatData = JSON.parse(formatRaw);
+  const jsonText = extractOutputText(formatData);
+
   return {
-    parsed: parseJsonObject(outputText),
+    parsed: parseJsonObject(jsonText),
     diagnostics: {
       webSearchCalls,
-      responseId: data.id || null,
-      responseStatus: data.status || null,
-      outputTextLength: outputText.length
+      searchResponseId: searchData.id || null,
+      formatResponseId: formatData.id || null,
+      researchTextLength: researchText.length,
+      jsonTextLength: jsonText.length
     }
   };
 }
