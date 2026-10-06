@@ -199,8 +199,18 @@ async function callSearch(prompt) {
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      tools: [{ type: "web_search" }],
-      tool_choice: "auto",
+      tools: [{
+        type: "web_search",
+        search_context_size: "high",
+        user_location: {
+          type: "approximate",
+          country: "BE",
+          city: "Antwerp",
+          region: "Flanders"
+        }
+      }],
+      tool_choice: "required",
+      include: ["web_search_call.action.sources"],
       input: prompt,
       max_output_tokens: 4200
     })
@@ -220,7 +230,19 @@ async function callSearch(prompt) {
   }
 
   const data = await response.json();
-  return parseJson(extractText(data));
+  const webCalls = (data.output || []).filter(item => item.type === "web_search_call");
+  const sourceCount = webCalls.reduce((sum, call) => {
+    const sources = call?.action?.sources;
+    return sum + (Array.isArray(sources) ? sources.length : 0);
+  }, 0);
+  return {
+    parsed: parseJson(extractText(data)),
+    diagnostics: {
+      webSearchCalls: webCalls.length,
+      sources: sourceCount,
+      responseId: data.id || null
+    }
+  };
 }
 
 function finaliseJobs(rawJobs, seenUrls, existing = []) {
@@ -267,18 +289,26 @@ async function searchJobs(req, res) {
 
   try {
     const first = await callSearch(promptFor(mode, seenUrls));
-    let jobs = finaliseJobs(first.jobs, seenUrls);
+    let jobs = finaliseJobs(first.parsed.jobs, seenUrls);
+    const diagnostics = [first.diagnostics];
+    let passes = 1;
 
     if (jobs.length < 4) {
       const second = await callSearch(fallbackPrompt(mode, seenUrls, jobs));
-      jobs = finaliseJobs(second.jobs, seenUrls, jobs);
+      diagnostics.push(second.diagnostics);
+      jobs = finaliseJobs(second.parsed.jobs, seenUrls, jobs);
+      passes = 2;
     }
 
     sendJson(res, 200, {
       jobs,
       searchedAt: new Date().toISOString(),
       model: OPENAI_MODEL,
-      searchPasses: jobs.length < 4 ? 2 : 1
+      searchPasses: passes,
+      diagnostics: {
+        webSearchCalls: diagnostics.reduce((sum, d) => sum + (d.webSearchCalls || 0), 0),
+        sources: diagnostics.reduce((sum, d) => sum + (d.sources || 0), 0)
+      }
     });
   } catch (error) {
     console.error(error);
