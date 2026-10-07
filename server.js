@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "2.2.1-stable-search";
+const APP_VERSION = "2.3.0-persistent-history";
 
 const MODES = {
   reasonable: {
@@ -177,14 +177,14 @@ ${cfg.geography}
 RULES:
 1. Find up to 5 promising vacancies, but return only those that pass final live verification.
 2. HARD FRESHNESS RULE: only consider vacancies with a publication/posting date within the last 7 calendar days. Prefer the last 72 hours. NEVER widen beyond 7 days.
-3. A precise publication date is mandatory. Verify it from the live vacancy/ATS page, employer page metadata, or another credible current source. If you cannot establish YYYY-MM-DD, exclude it.
-4. The vacancy must appear currently open and accepting applications. Ignore cached, indexed, archived, expired, removed, filled, or "job no longer available" pages.
-5. English must be sufficient. Reject jobs that explicitly require fluent/professional Dutch or French. One exceptional role may be included only if local language is clearly optional/preferred.
-6. Strongly prefer the employer's official career page or active ATS direct application page. Do not use generic career homepages, search-result pages, stale aggregators, or copied listings when the original vacancy is unavailable.
-7. Check the actual role requirements. Do not recommend roles with major must-have requirements the candidate clearly lacks.
-8. Score fit strictly from 0.0 to 10.0.
+3. A precise publication date is mandatory. Verify it from the live vacancy/ATS page, employer metadata, or a reliable current dated vacancy source. If you cannot establish an exact YYYY-MM-DD date, exclude it.
+4. The vacancy must be currently open and accepting applications. Ignore cached, archived, expired, removed, filled, unavailable, 404, or "no longer accepting applications" pages.
+5. English must be sufficient for doing the job. Reject roles that require fluent/professional Dutch or French. Do not assume English is sufficient just because the ad is written in English.
+6. Prefer the employer's official career page or active ATS direct vacancy page. A generic careers homepage or stale aggregator is not an acceptable final link.
+7. Check the actual requirements against this candidate profile. Return only meaningfully relevant roles with a fit score of at least 7.0/10. Reject roles with a major must-have gap.
+8. For each candidate, do a separate verification search using company + exact title where needed. Cross-check both (a) current live status and (b) posting date. Do not rely on an old search-engine snippet alone.
 9. Never return a role from NEVER REPEAT or a URL from ALREADY SEEN.
-10. Do not invent jobs, dates, companies or URLs. It is better to return fewer candidates than stale ones.
+10. Do not invent jobs, dates, companies, language requirements or URLs. Fewer verified vacancies are better than stale or weak matches.
 
 NEVER REPEAT:
 ${NEVER_REPEAT.join("\n")}
@@ -192,12 +192,14 @@ ${NEVER_REPEAT.join("\n")}
 ALREADY SEEN URLS:
 ${seen.length ? seen.join("\n") : "None"}
 
-After completing the web research, return a concise vacancy dossier.
-For each vacancy include these exact fields on separate lines:
+After completing the web research, return only vacancies that pass every rule.
+For each accepted vacancy include these exact fields on separate lines:
 TITLE, COMPANY, LOCATION, DIRECT_URL, PUBLISHED_DATE, LANGUAGE_CHECK, SCORE, WHY_FIT_1, WHY_FIT_2, WHY_FIT_3.
-Always write the full direct URL explicitly as plain text.
+Always write the full direct vacancy URL explicitly as plain text.
+PUBLISHED_DATE must be exact YYYY-MM-DD.
+LANGUAGE_CHECK must explicitly confirm that English is sufficient and that Dutch/French is not mandatory.
 Do not use markdown tables.
-Do not invent any missing field; write "unknown" when verification is not possible.`;
+If any required fact cannot be verified, exclude that vacancy rather than writing unknown.`;
 }
 
 function parseVerifiedJobs(text) {
@@ -261,13 +263,14 @@ Today is ${today} in Belgium.
 Before returning ANY vacancy:
 - Open/check the exact current vacancy or ATS page.
 - Confirm the specific job is still live and accepting applications now.
-- Confirm an exact publication/posting date from a credible source.
+- Confirm an exact publication/posting date from a credible source. Prefer the vacancy/ATS metadata; if needed cross-check a reliable dated vacancy source.
 - Publication date MUST be within the last 7 calendar days.
-- If exact date cannot be established, REJECT the vacancy.
+- If exact date cannot be established as YYYY-MM-DD, REJECT the vacancy. Do not output "date not shown".
 - If the page is unavailable, expired, archived, removed, 404, redirects to a generic careers page, or says no longer accepting applications, REJECT it.
 - If the employer/ATS vacancy is dead, do not substitute an aggregator copy.
-- Mandatory fluent/professional Dutch or French means REJECT.
-- Never include an old vacancy just to reach five results.
+- Confirm from the requirements that English is sufficient. Mandatory fluent/professional Dutch or French means REJECT.
+- The role must have a genuine fit to the candidate profile and score at least 7.0/10.
+- Never include an old, weakly related, or language-mismatched vacancy just to reach five results.
 - 0 to 5 results is acceptable. Freshness and live status are more important than quantity.
 
 OUTPUT FORMAT:
@@ -387,6 +390,8 @@ async function searchJobs(req, res) {
       .map(cleanJob)
       .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url) && job.whyFit.length === 3)
       .filter(job => isFreshPublishedDate(job.publishedDate))
+      .filter(job => job.score >= 7)
+      .filter(job => /english/i.test(job.languageCheck) && !/mandatory.*(dutch|french)|(dutch|french).*mandatory/i.test(job.languageCheck))
       .filter(job => !excluded.has(job.url))
       .filter(job => {
         const key = `${job.company.toLowerCase()}|${job.title.toLowerCase()}`;
