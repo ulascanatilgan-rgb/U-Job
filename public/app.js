@@ -9,15 +9,89 @@ function syncRunButton(){const busy=busyModes[activeMode];els.run.disabled=busy;
 function render(){const meta=MODES[activeMode],modeState=state[activeMode];els.title.textContent=meta.title;els.hint.textContent=meta.hint;els.lastUpdate.textContent=modeState.lastUpdate?`Updated ${fmtDate(modeState.lastUpdate,true)}`:"";els.historyCount.textContent=modeState.runs.reduce((sum,run)=>sum+run.jobs.length,0);els.status.textContent=modeStatus[activeMode]||"";renderResults(modeState.latest);renderHistory(modeState.runs);syncRunButton()}
 function renderResults(jobs){if(!jobs.length){els.results.innerHTML='<div class="empty">Run a search to find current vacancies.</div>';return}els.results.innerHTML=jobs.map(job=>`<article class="job"><div class="score">${esc(Number(job.score).toFixed(1))}</div><h2 class="job-title">${esc(job.title)}</h2><div class="job-meta">${esc(job.company)} · ${esc(job.location)}${job.publishedDate?` · Published ${esc(job.publishedDate)}`:""}</div><div class="why">${(job.whyFit||[]).map(esc).join(" ")}</div><a class="apply" href="${esc(job.url)}" target="_blank" rel="noopener noreferrer">Apply ↗</a>${job.languageCheck?`<div class="lang">${esc(job.languageCheck)}</div>`:""}</article>`).join("")}
 function renderHistory(runs){if(!runs.length){els.history.innerHTML='<div class="empty">No history.</div>';return}els.history.innerHTML=runs.map(run=>`<div class="run-group"><div class="run-date">${esc(fmtDate(run.at,true))}</div>${run.jobs.map(job=>`<a class="history-row" href="${esc(job.url)}" target="_blank" rel="noopener noreferrer"><div class="history-score">${esc(Number(job.score).toFixed(1))}</div><div><div class="history-main"><b>${esc(job.title)}</b> · ${esc(job.company)}</div><div class="history-sub">${esc(job.location)}${job.publishedDate?` · Published ${esc(job.publishedDate)}`:""}</div></div></a>`).join("")}</div>`).join("")}
-async function fetchSearchOnce(mode){const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),70000);try{return await fetch("/api/search",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode,seenUrls:seenUrlsForMode(mode)}),signal:controller.signal,cache:"no-store"});}finally{clearTimeout(timeout);}}async function runSearch(){const runMode=activeMode;if(busyModes[runMode])return;busyModes[runMode]=true;modeStatus[runMode]="Searching and verifying 5 live vacancies…";if(activeMode===runMode){els.status.textContent=modeStatus[runMode];syncRunButton();}try{let response;try{response=await fetchSearchOnce(runMode);}catch(firstError){if(firstError?.name==="AbortError"||/load failed|failed to fetch/i.test(String(firstError?.message||""))){modeStatus[runMode]="Connection interrupted. Retrying once…";if(activeMode===runMode)els.status.textContent=modeStatus[runMode];response=await fetchSearchOnce(runMode);}else{throw firstError;}}const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Search failed.");const jobs=Array.isArray(data.jobs)?data.jobs:[];const at=data.searchedAt||new Date().toISOString();state[runMode].latest=jobs;state[runMode].lastUpdate=at;state[runMode].runs.unshift({at,jobs:jobs.map(({whyFit,languageCheck,...small})=>small)});state[runMode].runs=mergeRuns(state[runMode].runs,[]);saveState();if(jobs.length){
-      modeStatus[runMode]=jobs.length===5?"5 verified matches.":`${jobs.length} verified matches found; search returned fewer than 5 live results.`;if(activeMode===runMode)els.status.textContent=modeStatus[runMode];
-    }else{
-      const diag=data?.diagnostics||{};
-      modeStatus[runMode]=diag.webSearchCalls?"Search completed but no verified roles were returned.":"The API responded, but no live web search call was recorded.";if(activeMode===runMode){els.status.textContent=modeStatus[runMode];els.results.innerHTML=`<div class="empty">${esc(modeStatus[runMode])}</div>`;}
+async function fetchSearchOnce(mode){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),70000);
+  try{
+    return await fetch("/api/search",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({mode:mode,seenUrls:seenUrlsForMode(mode)}),
+      signal:controller.signal,
+      cache:"no-store"
+    });
+  }finally{
+    clearTimeout(timeout);
+  }
+}
+
+async function runSearch(){
+  const runMode=activeMode;
+  if(busyModes[runMode])return;
+
+  busyModes[runMode]=true;
+  modeStatus[runMode]="Searching and verifying 5 live vacancies…";
+  if(activeMode===runMode){
+    els.status.textContent=modeStatus[runMode];
+    syncRunButton();
+  }
+
+  try{
+    let response;
+    try{
+      response=await fetchSearchOnce(runMode);
+    }catch(firstError){
+      if(firstError?.name==="AbortError"||/load failed|failed to fetch/i.test(String(firstError?.message||""))){
+        modeStatus[runMode]="Connection interrupted. Retrying once…";
+        if(activeMode===runMode)els.status.textContent=modeStatus[runMode];
+        response=await fetchSearchOnce(runMode);
+      }else{
+        throw firstError;
+      }
     }
-    if(jobs.length&&activeMode===runMode)render();
+
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||"Search failed.");
+
+    const jobs=Array.isArray(data.jobs)?data.jobs:[];
+    const at=data.searchedAt||new Date().toISOString();
+
+    state[runMode].latest=jobs;
+    state[runMode].lastUpdate=at;
+    state[runMode].runs.unshift({
+      at:at,
+      jobs:jobs.map(({whyFit,languageCheck,...small})=>small)
+    });
+    state[runMode].runs=mergeRuns(state[runMode].runs,[]);
+    saveState();
+
+    if(jobs.length===5){
+      modeStatus[runMode]="5 verified matches.";
+    }else if(jobs.length>0){
+      modeStatus[runMode]=String(jobs.length)+" verified matches found.";
+    }else{
+      modeStatus[runMode]="Search completed but no verified roles were returned.";
+    }
+
+    if(activeMode===runMode){
+      els.status.textContent=modeStatus[runMode];
+      render();
+    }
   }catch(error){
-    const message=error?.name==="AbortError"?"Search timed out. Please run again.":(error.message||"Search failed.");
-    modeStatus[runMode]=message;if(activeMode===runMode){els.status.textContent=message;els.results.innerHTML=`<div class="empty"><b>Search error:</b> ${esc(message)}</div>`;}finally{busyModes[runMode]=false;if(activeMode===runMode)syncRunButton()}}
+    const message=error?.name==="AbortError"
+      ?"Search timed out. Please run again."
+      :(error.message||"Search failed.");
+    modeStatus[runMode]=message;
+
+    if(activeMode===runMode){
+      els.status.textContent=message;
+      els.results.innerHTML='<div class="empty"><b>Search error:</b> '+esc(message)+'</div>';
+    }
+  }finally{
+    busyModes[runMode]=false;
+    if(activeMode===runMode)syncRunButton();
+  }
+}
+
 async function checkHealth(){try{const r=await fetch("/api/health?fresh=25",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));els.run.addEventListener("click",runSearch);els.historyToggle.addEventListener("click",()=>{const opening=els.history.hidden;els.history.hidden=!opening;els.historyToggle.setAttribute("aria-expanded",String(opening))});if("serviceWorker"in navigator)navigator.serviceWorker.register("/service-worker.js?v=25").catch(()=>{});renderToday();setInterval(renderToday,60000);setMode(activeMode);checkHealth();
