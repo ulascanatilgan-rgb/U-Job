@@ -175,7 +175,7 @@ GEOGRAPHY:
 ${cfg.geography}
 
 RULES:
-1. Find up to 5 promising vacancies, but return only those that pass final live verification.
+1. Find and verify up to 10 promising vacancies so the backend can select the best 5 after final checks. Aim for at least 8 verified candidates whenever possible.
 2. RETURN EXACTLY 5 RESULTS whenever five valid live vacancies can be found. Use this search ladder in order and stop once five verified roles are available:
    TIER A: published in the last 7 days, preferred geography and exact mode fit.
    TIER B: last 14 days, widen geography across Belgium.
@@ -276,7 +276,7 @@ Before returning ANY vacancy:
 - If the employer/ATS vacancy is dead, do not substitute an aggregator copy.
 - Confirm from the requirements that English is sufficient. Mandatory fluent/professional Dutch or French means REJECT.
 - The role must have a genuine fit to the candidate profile and score at least 6.5/10.
-- Keep searching and widening within the stated ladder until you have exactly 5 verified roles whenever five exist.
+- Keep searching and widening within the stated ladder until you have at least 8 verified candidate roles whenever possible; the backend will select the best 5.
 - Prefer unseen roles. If fewer than five unseen roles pass, previously seen but still-live roles may fill the remaining slots.
 - Never include a closed, language-mismatched or clearly irrelevant vacancy just to reach five results.
 
@@ -326,7 +326,7 @@ If nothing passes all checks, output exactly: NO_VERIFIED_JOBS
         }],
         tool_choice: "required",
         input: strictPrompt,
-        max_output_tokens: 4200
+        max_output_tokens: 5200
       })
     });
   } catch (error) {
