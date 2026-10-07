@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "2.4.0-five-independent";
+const APP_VERSION = "2.4.1-five-independent";
 
 const MODES = {
   reasonable: {
@@ -188,13 +188,13 @@ RULES:
 6. Prefer the employer's official career page or active ATS direct vacancy page. A generic careers homepage or stale aggregator is not an acceptable final link.
 7. Check the actual requirements against this candidate profile. Return only meaningfully relevant roles with a fit score of at least 6.5/10. Reject roles with a major must-have gap.
 8. For each candidate, do a separate verification search using company + exact title where needed. Cross-check both (a) current live status and (b) posting date. Do not rely on an old search-engine snippet alone.
-9. Never return a role from NEVER REPEAT or a URL from ALREADY SEEN.
-10. Do not invent jobs, dates, companies, language requirements or URLs. Fewer verified vacancies are better than stale or weak matches.
+9. NEVER REPEAT entries remain excluded. For ALREADY SEEN URLs, prefer new/unseen roles first; however, if fewer than five unseen verified live roles exist, previously seen URLs may be reused to fill the list to exactly five.
+10. Keep searching through the freshness/geography ladder until you have exactly five verified roles whenever five valid live roles exist. Never invent jobs, dates, companies, language requirements or URLs.
 
 NEVER REPEAT:
 ${NEVER_REPEAT.join("\n")}
 
-ALREADY SEEN URLS:
+ALREADY SEEN URLS — avoid when possible, but reuse only if needed to reach five verified live results:
 ${seen.length ? seen.join("\n") : "None"}
 
 After completing the web research, return only vacancies that pass every rule.
@@ -277,6 +277,7 @@ Before returning ANY vacancy:
 - Confirm from the requirements that English is sufficient. Mandatory fluent/professional Dutch or French means REJECT.
 - The role must have a genuine fit to the candidate profile and score at least 6.5/10.
 - Keep searching and widening within the stated ladder until you have exactly 5 verified roles whenever five exist.
+- Prefer unseen roles. If fewer than five unseen roles pass, previously seen but still-live roles may fill the remaining slots.
 - Never include a closed, language-mismatched or clearly irrelevant vacancy just to reach five results.
 
 OUTPUT FORMAT:
@@ -389,7 +390,6 @@ async function searchJobs(req, res) {
 
   try {
     const result = await callOpenAI(buildPrompt(mode, seenUrls));
-    const excluded = new Set(seenUrls.map(normalizeUrl));
     const duplicates = new Set();
 
     const jobs = (Array.isArray(result.parsed?.jobs) ? result.parsed.jobs : [])
@@ -397,8 +397,11 @@ async function searchJobs(req, res) {
       .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url) && job.whyFit.length === 3)
       .filter(job => isAllowedPublishedDate(job.publishedDate))
       .filter(job => job.score >= 6.5)
-      .filter(job => /english/i.test(job.languageCheck) && !/mandatory.*(dutch|french)|(dutch|french).*mandatory/i.test(job.languageCheck))
-      .filter(job => !excluded.has(job.url))
+      .filter(job => {
+        const lang = String(job.languageCheck || "");
+        const cleaned = lang.replace(/\bnot\s+(mandatory|required)\b/gi, "").replace(/\bno\s+(mandatory|required)\b/gi, "");
+        return /english/i.test(lang) && !/\b(dutch|french)\b.{0,30}\b(required|mandatory|fluent|professional)\b/i.test(cleaned);
+      })
       .filter(job => {
         const key = `${job.company.toLowerCase()}|${job.title.toLowerCase()}`;
         if (duplicates.has(key)) return false;
