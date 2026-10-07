@@ -123,12 +123,9 @@ function renderActionResults(jobs){
     els.results.innerHTML='<div class="empty">Tick Applied on any vacancy to keep it here.</div>';
     return;
   }
-  els.results.innerHTML=jobs.map(job=>`<article class="job action-job">
-    <div class="score">${esc(Number(job.score||0).toFixed(1))}</div>
-    <h2 class="job-title">${esc(job.title)}</h2>
-    <div class="job-meta">${esc(job.company)} · ${esc(job.location)}${job.publishedDate?` · Published ${esc(job.publishedDate)}`:""}${job.sourceMode?` · ${esc(MODES[job.sourceMode]?.title||job.sourceMode)}`:""}</div>
-    ${job.whyFit?.length?`<div class="why">${job.whyFit.map(esc).join(" ")}</div>`:""}
-    <a class="apply" href="${esc(job.url)}" target="_blank" rel="noopener noreferrer">Open ↗</a>
+  els.results.innerHTML=jobs.map(job=>`<article class="job action-job action-compact">
+    <h2 class="job-title"><a class="action-title-link" href="${esc(job.url)}" target="_blank" rel="noopener noreferrer">${esc(job.title)}</a></h2>
+    <div class="job-meta">${esc(job.company)} · ${esc(job.location)}${job.publishedDate?` · Published ${esc(job.publishedDate)}`:""}</div>
     ${appliedControl(job,job.sourceMode||"",false)}
   </article>`).join("");
   bindAppliedControls(els.results);
