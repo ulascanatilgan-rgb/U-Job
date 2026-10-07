@@ -61,7 +61,7 @@ async function pollSearch(mode){
   if(!pending?.id)return;
 
   try{
-    const response=await apiFetch("/api/search/status?id="+encodeURIComponent(pending.id),{},12000);
+    const response=await apiFetch("/api/search/status?id="+encodeURIComponent(pending.id)+"&mode="+encodeURIComponent(mode),{},12000);
 
     if(response.status===404){
       const restarts=Number(pending.restarts||0);
@@ -171,5 +171,5 @@ function resumePendingSearches(){
   if(activeMode)render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=25",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
-document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));els.run.addEventListener("click",runSearch);els.historyToggle.addEventListener("click",()=>{const opening=els.history.hidden;els.history.hidden=!opening;els.historyToggle.setAttribute("aria-expanded",String(opening))});document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")resumePendingSearches()});window.addEventListener("focus",resumePendingSearches);if("serviceWorker"in navigator)navigator.serviceWorker.register("/service-worker.js?v=26").catch(()=>{});renderToday();setInterval(renderToday,60000);setMode(activeMode);checkHealth();resumePendingSearches();
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=27",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));els.run.addEventListener("click",runSearch);els.historyToggle.addEventListener("click",()=>{const opening=els.history.hidden;els.history.hidden=!opening;els.historyToggle.setAttribute("aria-expanded",String(opening))});document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")resumePendingSearches()});window.addEventListener("focus",resumePendingSearches);renderToday();setInterval(renderToday,60000);setMode(activeMode);checkHealth();resumePendingSearches();
