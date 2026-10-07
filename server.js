@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "2.4.1-five-independent";
+const APP_VERSION = "2.4.2-date-fix";
 
 const MODES = {
   reasonable: {
@@ -374,6 +374,28 @@ If nothing passes all checks, output exactly: NO_VERIFIED_JOBS
       outputTextLength: outputText.length
     }
   };
+}
+
+
+function isAllowedPublishedDate(value) {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+
+  const [year, month, day] = text.split("-").map(Number);
+  const published = Date.UTC(year, month - 1, day);
+
+  const todayText = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Brussels",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(new Date());
+
+  const [ty, tm, td] = todayText.split("-").map(Number);
+  const today = Date.UTC(ty, tm - 1, td);
+
+  const ageDays = (today - published) / 86400000;
+  return Number.isFinite(ageDays) && ageDays >= 0 && ageDays <= 60;
 }
 
 
