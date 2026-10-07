@@ -23,3 +23,5 @@ The app listens on Railway's PORT variable and falls back to port 3000 locally.
 <!-- deploy-trigger: ujob-2.4.1-five-independent -->
 
 <!-- deploy-trigger: ujob-2.5.0-background-search -->
+
+<!-- deploy-trigger: ujob-2.6.0-openai-background -->
