@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "2.4.3-five-results-fix";
+const APP_VERSION = "2.5.0-background-search";
 
 const MODES = {
   reasonable: {
@@ -303,7 +303,7 @@ If nothing passes all checks, output exactly: NO_VERIFIED_JOBS
 `;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const timeout = setTimeout(() => controller.abort(), 110000);
 
   let response;
   try {
@@ -399,7 +399,54 @@ function isAllowedPublishedDate(value) {
 }
 
 
-async function searchJobs(req, res) {
+const SEARCH_TASKS = new Map();
+
+function makeSearchId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function pruneSearchTasks() {
+  const cutoff = Date.now() - 6 * 60 * 60 * 1000;
+  for (const [id, task] of SEARCH_TASKS.entries()) {
+    if ((task.updatedAt || task.createdAt || 0) < cutoff) SEARCH_TASKS.delete(id);
+  }
+}
+
+async function executeSearch(mode, seenUrls) {
+  const result = await callOpenAI(buildPrompt(mode, seenUrls));
+  const duplicates = new Set();
+
+  const jobs = (Array.isArray(result.parsed?.jobs) ? result.parsed.jobs : [])
+    .map(cleanJob)
+    .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url) && job.whyFit.length === 3)
+    .filter(job => isAllowedPublishedDate(job.publishedDate))
+    .filter(job => job.score >= 6.5)
+    .filter(job => {
+      const lang = String(job.languageCheck || "");
+      const cleaned = lang
+        .replace(/\bnot\s+(mandatory|required)\b/gi, "")
+        .replace(/\bno\s+(mandatory|required)\b/gi, "");
+      return /english/i.test(lang) &&
+        !/\b(dutch|french)\b.{0,30}\b(required|mandatory|fluent|professional)\b/i.test(cleaned);
+    })
+    .filter(job => {
+      const key = `${job.company.toLowerCase()}|${job.title.toLowerCase()}`;
+      if (duplicates.has(key)) return false;
+      duplicates.add(key);
+      return true;
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+
+  return {
+    jobs,
+    searchedAt: new Date().toISOString(),
+    model: OPENAI_MODEL,
+    diagnostics: result.diagnostics
+  };
+}
+
+async function startSearch(req, res) {
   if (!OPENAI_API_KEY) {
     return sendJson(res, 503, { error: "OPENAI_API_KEY is not configured in Railway." });
   }
@@ -409,48 +456,102 @@ async function searchJobs(req, res) {
   if (!MODES[mode]) return sendJson(res, 400, { error: "Unknown mode." });
 
   const seenUrls = Array.isArray(body?.seenUrls) ? body.seenUrls.map(String) : [];
+  const id = makeSearchId();
+  const now = Date.now();
 
-  try {
-    const result = await callOpenAI(buildPrompt(mode, seenUrls));
-    const duplicates = new Set();
+  SEARCH_TASKS.set(id, {
+    id,
+    mode,
+    status: "running",
+    createdAt: now,
+    updatedAt: now,
+    result: null,
+    error: null
+  });
 
-    const jobs = (Array.isArray(result.parsed?.jobs) ? result.parsed.jobs : [])
-      .map(cleanJob)
-      .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url) && job.whyFit.length === 3)
-      .filter(job => isAllowedPublishedDate(job.publishedDate))
-      .filter(job => job.score >= 6.5)
-      .filter(job => {
-        const lang = String(job.languageCheck || "");
-        const cleaned = lang.replace(/\bnot\s+(mandatory|required)\b/gi, "").replace(/\bno\s+(mandatory|required)\b/gi, "");
-        return /english/i.test(lang) && !/\b(dutch|french)\b.{0,30}\b(required|mandatory|fluent|professional)\b/i.test(cleaned);
-      })
-      .filter(job => {
-        const key = `${job.company.toLowerCase()}|${job.title.toLowerCase()}`;
-        if (duplicates.has(key)) return false;
-        duplicates.add(key);
-        return true;
-      })
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
-
-    return sendJson(res, 200, {
-      jobs,
-      searchedAt: new Date().toISOString(),
-      model: OPENAI_MODEL,
-      diagnostics: result.diagnostics
+  // Run independently of the browser connection.
+  executeSearch(mode, seenUrls)
+    .then(result => {
+      const task = SEARCH_TASKS.get(id);
+      if (!task) return;
+      task.status = "done";
+      task.result = result;
+      task.updatedAt = Date.now();
+    })
+    .catch(error => {
+      console.error("U-Job background search error:", error);
+      const task = SEARCH_TASKS.get(id);
+      if (!task) return;
+      task.status = "error";
+      task.error = error?.message || "Search failed.";
+      task.updatedAt = Date.now();
     });
-  } catch (error) {
-    console.error("U-Job search error:", error);
-    let status = 500;
-    if (error.httpStatus === 401) status = 502;
-    else if (error.httpStatus === 429) status = 502;
-    else if (error.httpStatus >= 400 && error.httpStatus < 500) status = 502;
 
-    return sendJson(res, status, {
-      error: error.message || "Search failed."
+  pruneSearchTasks();
+  return sendJson(res, 202, {
+    searchId: id,
+    mode,
+    status: "running",
+    appVersion: APP_VERSION
+  });
+}
+
+function getSearchStatus(url, res) {
+  pruneSearchTasks();
+  const id = String(url.searchParams.get("id") || "");
+  if (!id) return sendJson(res, 400, { error: "Missing search id." });
+
+  const task = SEARCH_TASKS.get(id);
+  if (!task) {
+    return sendJson(res, 404, {
+      error: "Search task not found. It may have expired or the server restarted."
     });
   }
+
+  if (task.status === "done") {
+    return sendJson(res, 200, {
+      searchId: id,
+      mode: task.mode,
+      status: "done",
+      ...task.result
+    });
+  }
+
+  if (task.status === "error") {
+    return sendJson(res, 200, {
+      searchId: id,
+      mode: task.mode,
+      status: "error",
+      error: task.error || "Search failed."
+    });
+  }
+
+  return sendJson(res, 200, {
+    searchId: id,
+    mode: task.mode,
+    status: "running"
+  });
 }
+
+async function searchJobs(req, res) {
+  if (!OPENAI_API_KEY) {
+    return sendJson(res, 503, { error: "OPENAI_API_KEY is not configured in Railway." });
+  }
+
+  const body = await readJson(req);
+  const mode = String(body?.mode || "");
+  if (!MODES[mode]) return sendJson(res, 400, { error: "Unknown mode." });
+  const seenUrls = Array.isArray(body?.seenUrls) ? body.seenUrls.map(String) : [];
+
+  try {
+    const result = await executeSearch(mode, seenUrls);
+    return sendJson(res, 200, result);
+  } catch (error) {
+    console.error("U-Job search error:", error);
+    return sendJson(res, 500, { error: error?.message || "Search failed." });
+  }
+}
+
 
 async function serveStatic(req, res, pathname) {
   const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
@@ -493,6 +594,14 @@ const server = http.createServer(async (req, res) => {
         railwayService: process.env.RAILWAY_SERVICE_NAME || null,
         railwayCommit: process.env.RAILWAY_GIT_COMMIT_SHA || null
       });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/search/start") {
+      return await startSearch(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/search/status") {
+      return getSearchStatus(url, res);
     }
 
     if (req.method === "POST" && url.pathname === "/api/search") {
