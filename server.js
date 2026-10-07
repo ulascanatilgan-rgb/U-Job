@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "2.5.0-background-search";
+const APP_VERSION = "2.6.0-openai-background";
 
 const MODES = {
   reasonable: {
@@ -246,12 +246,7 @@ function parseVerifiedJobs(text) {
   return { jobs };
 }
 
-async function callOpenAI(prompt) {
-  const headers = {
-    "Authorization": `Bearer ${OPENAI_API_KEY}`,
-    "Content-Type": "application/json"
-  };
-
+function buildStrictPrompt(prompt) {
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Brussels",
     year: "numeric",
@@ -259,7 +254,7 @@ async function callOpenAI(prompt) {
     day: "2-digit"
   }).format(new Date());
 
-  const strictPrompt = `${prompt}
+  return `${prompt}
 
 FINAL VERIFICATION MUST HAPPEN IN THIS SAME LIVE WEB SEARCH RUN.
 
@@ -268,20 +263,19 @@ Today is ${today} in Belgium.
 Before returning ANY vacancy:
 - Open/check the exact current vacancy or ATS page.
 - Confirm the specific job is still live and accepting applications now.
-- Confirm an exact publication/posting date from a credible source. Prefer the vacancy/ATS metadata; if needed cross-check a reliable dated vacancy source.
-- Prefer vacancies from the last 7 days. If fewer than five pass, widen to 14 days, then 30 days, then at most 60 days.
+- Confirm an exact publication/posting date from a credible source. Prefer vacancy/ATS metadata; if needed cross-check a reliable dated source.
+- Prefer the last 7 days. If fewer than five pass, widen to 14 days, then 30 days, then at most 60 days.
 - Every accepted vacancy must still be live and accepting applications today.
-- If exact date cannot be established as YYYY-MM-DD, REJECT the vacancy. Do not output "date not shown".
+- If exact date cannot be established as YYYY-MM-DD, REJECT it.
 - If the page is unavailable, expired, archived, removed, 404, redirects to a generic careers page, or says no longer accepting applications, REJECT it.
-- If the employer/ATS vacancy is dead, do not substitute an aggregator copy.
-- Confirm from the requirements that English is sufficient. Mandatory fluent/professional Dutch or French means REJECT.
-- The role must have a genuine fit to the candidate profile and score at least 6.5/10.
-- Keep searching and widening within the stated ladder until you have at least 8 verified candidate roles whenever possible; the backend will select the best 5.
-- Prefer unseen roles. If fewer than five unseen roles pass, previously seen but still-live roles may fill the remaining slots.
-- Never include a closed, language-mismatched or clearly irrelevant vacancy just to reach five results.
+- Confirm English is sufficient. Mandatory fluent/professional Dutch or French means REJECT.
+- The role must have genuine fit to the candidate and score at least 6.5/10.
+- Find and verify up to 10 strong candidates so the backend can select the best five.
+- Prefer unseen roles, but previously seen still-live roles may fill remaining slots.
+- Never include a closed, language-mismatched or clearly irrelevant vacancy just to reach five.
 
 OUTPUT FORMAT:
-Return plain text only. For each accepted vacancy use exactly this block:
+Return plain text only. For each accepted vacancy use exactly:
 
 ---JOB---
 VERIFIED_OPEN: YES
@@ -290,92 +284,17 @@ COMPANY: ...
 LOCATION: ...
 DIRECT_URL: https://...
 PUBLISHED_DATE: YYYY-MM-DD
-LANGUAGE_CHECK: ...
+LANGUAGE_CHECK: English sufficient; Dutch/French not mandatory.
 SCORE: 8.7
 WHY_FIT_1: ...
 WHY_FIT_2: ...
 WHY_FIT_3: ...
 
 Do not output rejected vacancies.
-Do not use markdown tables.
 Do not output "date not shown", "unknown", relative dates, or guessed dates.
 If nothing passes all checks, output exactly: NO_VERIFIED_JOBS
 `;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 110000);
-
-  let response;
-  try {
-    response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers,
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        tools: [{
-          type: "web_search",
-          search_context_size: "medium",
-          user_location: {
-            type: "approximate",
-            country: "BE",
-            city: "Antwerp",
-            region: "Flanders",
-            timezone: "Europe/Brussels"
-          }
-        }],
-        tool_choice: "required",
-        input: strictPrompt,
-        max_output_tokens: 5200
-      })
-    });
-  } catch (error) {
-    if (error?.name === "AbortError") {
-      const e = new Error("Live search timed out. Please run it again.");
-      e.httpStatus = 504;
-      throw e;
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  const raw = await response.text();
-
-  if (!response.ok) {
-    let detail = "";
-    try {
-      const parsed = JSON.parse(raw);
-      detail = parsed?.error?.message ? String(parsed.error.message) : "";
-    } catch {}
-    const error = new Error(detail || `OpenAI web-search error (${response.status}).`);
-    error.httpStatus = response.status;
-    throw error;
-  }
-
-  const data = JSON.parse(raw);
-  const outputText = extractOutputText(data);
-  const webSearchCalls = (data.output || []).filter(item => item?.type === "web_search_call").length;
-
-  if (!outputText) {
-    throw new Error("Live web search completed but returned no vacancy text.");
-  }
-
-  const parsed = outputText.includes("NO_VERIFIED_JOBS")
-    ? { jobs: [] }
-    : parseVerifiedJobs(outputText);
-
-  return {
-    parsed,
-    diagnostics: {
-      webSearchCalls,
-      responseId: data.id || null,
-      responseStatus: data.status || null,
-      outputTextLength: outputText.length
-    }
-  };
 }
-
 
 function isAllowedPublishedDate(value) {
   const text = String(value || "").trim();
@@ -393,30 +312,22 @@ function isAllowedPublishedDate(value) {
 
   const [ty, tm, td] = todayText.split("-").map(Number);
   const today = Date.UTC(ty, tm - 1, td);
-
   const ageDays = (today - published) / 86400000;
+
   return Number.isFinite(ageDays) && ageDays >= 0 && ageDays <= 60;
 }
 
+function finalizeJobsFromResponse(data) {
+  const outputText = extractOutputText(data);
+  if (!outputText) return [];
 
-const SEARCH_TASKS = new Map();
+  const parsed = outputText.includes("NO_VERIFIED_JOBS")
+    ? { jobs: [] }
+    : parseVerifiedJobs(outputText);
 
-function makeSearchId() {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function pruneSearchTasks() {
-  const cutoff = Date.now() - 6 * 60 * 60 * 1000;
-  for (const [id, task] of SEARCH_TASKS.entries()) {
-    if ((task.updatedAt || task.createdAt || 0) < cutoff) SEARCH_TASKS.delete(id);
-  }
-}
-
-async function executeSearch(mode, seenUrls) {
-  const result = await callOpenAI(buildPrompt(mode, seenUrls));
   const duplicates = new Set();
 
-  const jobs = (Array.isArray(result.parsed?.jobs) ? result.parsed.jobs : [])
+  return (Array.isArray(parsed.jobs) ? parsed.jobs : [])
     .map(cleanJob)
     .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url) && job.whyFit.length === 3)
     .filter(job => isAllowedPublishedDate(job.publishedDate))
@@ -437,13 +348,30 @@ async function executeSearch(mode, seenUrls) {
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, 5);
+}
 
-  return {
-    jobs,
-    searchedAt: new Date().toISOString(),
-    model: OPENAI_MODEL,
-    diagnostics: result.diagnostics
-  };
+async function openAIRequest(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Authorization": `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    }
+  });
+
+  const raw = await response.text();
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch {}
+
+  if (!response.ok) {
+    const detail = data?.error?.message || `OpenAI API error (${response.status}).`;
+    const error = new Error(detail);
+    error.httpStatus = response.status;
+    throw error;
+  }
+
+  return data;
 }
 
 async function startSearch(req, res) {
@@ -456,100 +384,112 @@ async function startSearch(req, res) {
   if (!MODES[mode]) return sendJson(res, 400, { error: "Unknown mode." });
 
   const seenUrls = Array.isArray(body?.seenUrls) ? body.seenUrls.map(String) : [];
-  const id = makeSearchId();
-  const now = Date.now();
+  const strictPrompt = buildStrictPrompt(buildPrompt(mode, seenUrls));
 
-  SEARCH_TASKS.set(id, {
-    id,
-    mode,
-    status: "running",
-    createdAt: now,
-    updatedAt: now,
-    result: null,
-    error: null
-  });
-
-  // Run independently of the browser connection.
-  executeSearch(mode, seenUrls)
-    .then(result => {
-      const task = SEARCH_TASKS.get(id);
-      if (!task) return;
-      task.status = "done";
-      task.result = result;
-      task.updatedAt = Date.now();
-    })
-    .catch(error => {
-      console.error("U-Job background search error:", error);
-      const task = SEARCH_TASKS.get(id);
-      if (!task) return;
-      task.status = "error";
-      task.error = error?.message || "Search failed.";
-      task.updatedAt = Date.now();
+  try {
+    const data = await openAIRequest("https://api.openai.com/v1/responses", {
+      method: "POST",
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        background: true,
+        store: true,
+        tools: [{
+          type: "web_search",
+          search_context_size: "medium",
+          user_location: {
+            type: "approximate",
+            country: "BE",
+            city: "Antwerp",
+            region: "Flanders",
+            timezone: "Europe/Brussels"
+          }
+        }],
+        tool_choice: "required",
+        input: strictPrompt,
+        max_output_tokens: 5200
+      })
     });
 
-  pruneSearchTasks();
-  return sendJson(res, 202, {
-    searchId: id,
-    mode,
-    status: "running",
-    appVersion: APP_VERSION
-  });
+    if (!data?.id) {
+      return sendJson(res, 502, { error: "OpenAI did not return a background response ID." });
+    }
+
+    return sendJson(res, 202, {
+      searchId: data.id,
+      mode,
+      status: data.status || "queued",
+      appVersion: APP_VERSION
+    });
+  } catch (error) {
+    console.error("U-Job start search error:", error);
+    return sendJson(res, 502, { error: error?.message || "Could not start search." });
+  }
 }
 
-function getSearchStatus(url, res) {
-  pruneSearchTasks();
-  const id = String(url.searchParams.get("id") || "");
-  if (!id) return sendJson(res, 400, { error: "Missing search id." });
-
-  const task = SEARCH_TASKS.get(id);
-  if (!task) {
-    return sendJson(res, 404, {
-      error: "Search task not found. It may have expired or the server restarted."
-    });
-  }
-
-  if (task.status === "done") {
-    return sendJson(res, 200, {
-      searchId: id,
-      mode: task.mode,
-      status: "done",
-      ...task.result
-    });
-  }
-
-  if (task.status === "error") {
-    return sendJson(res, 200, {
-      searchId: id,
-      mode: task.mode,
-      status: "error",
-      error: task.error || "Search failed."
-    });
-  }
-
-  return sendJson(res, 200, {
-    searchId: id,
-    mode: task.mode,
-    status: "running"
-  });
-}
-
-async function searchJobs(req, res) {
+async function getSearchStatus(url, res) {
   if (!OPENAI_API_KEY) {
     return sendJson(res, 503, { error: "OPENAI_API_KEY is not configured in Railway." });
   }
 
-  const body = await readJson(req);
-  const mode = String(body?.mode || "");
-  if (!MODES[mode]) return sendJson(res, 400, { error: "Unknown mode." });
-  const seenUrls = Array.isArray(body?.seenUrls) ? body.seenUrls.map(String) : [];
+  const id = String(url.searchParams.get("id") || "");
+  const mode = String(url.searchParams.get("mode") || "");
+  if (!id) return sendJson(res, 400, { error: "Missing search id." });
+  if (mode && !MODES[mode]) return sendJson(res, 400, { error: "Unknown mode." });
 
   try {
-    const result = await executeSearch(mode, seenUrls);
-    return sendJson(res, 200, result);
+    const data = await openAIRequest(
+      `https://api.openai.com/v1/responses/${encodeURIComponent(id)}`,
+      { method: "GET", headers: { "Content-Type": "application/json" } }
+    );
+
+    const status = String(data?.status || "in_progress");
+
+    if (status === "completed") {
+      const jobs = finalizeJobsFromResponse(data);
+      const webSearchCalls = (data.output || []).filter(item => item?.type === "web_search_call").length;
+
+      return sendJson(res, 200, {
+        searchId: id,
+        mode: mode || null,
+        status: "done",
+        jobs,
+        searchedAt: new Date().toISOString(),
+        model: OPENAI_MODEL,
+        diagnostics: {
+          webSearchCalls,
+          responseId: data.id || id,
+          responseStatus: status,
+          outputTextLength: extractOutputText(data).length
+        }
+      });
+    }
+
+    if (["failed","cancelled","incomplete"].includes(status)) {
+      return sendJson(res, 200, {
+        searchId: id,
+        mode: mode || null,
+        status: "error",
+        error: data?.error?.message || data?.incomplete_details?.reason || `OpenAI response ended with status: ${status}`
+      });
+    }
+
+    return sendJson(res, 200, {
+      searchId: id,
+      mode: mode || null,
+      status: "running",
+      openAIStatus: status
+    });
   } catch (error) {
-    console.error("U-Job search error:", error);
-    return sendJson(res, 500, { error: error?.message || "Search failed." });
+    console.error("U-Job status error:", error);
+    const status = error?.httpStatus === 404 ? 404 : 502;
+    return sendJson(res, status, { error: error?.message || "Could not read search status." });
   }
+}
+
+async function searchJobs(req, res) {
+  return sendJson(res, 410, {
+    error: "This endpoint was replaced by background search. Refresh U-Job and run again."
+  });
 }
 
 
@@ -568,9 +508,9 @@ async function serveStatic(req, res, pathname) {
 
     res.writeHead(200, {
       "Content-Type": MIME[ext] || "application/octet-stream",
-      "Cache-Control": relative === "service-worker.js"
-        ? "no-cache, no-store, must-revalidate"
-        : "public, max-age=60"
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      "Pragma": "no-cache",
+      "Expires": "0"
     });
 
     if (req.method === "HEAD") return res.end();
