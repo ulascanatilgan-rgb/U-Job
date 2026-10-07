@@ -17,3 +17,5 @@ Personal job-search PWA for Belgium.
    - appVersion: 2.0.0-clean
 
 The app listens on Railway's PORT variable and falls back to port 3000 locally.
+
+<!-- deploy-trigger: 2026-10-07-ujob-2.3.0 -->
