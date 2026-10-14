@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "2.7.1-actions-compact";
+const APP_VERSION = "2.8.0-ai-mode";
 
 const MODES = {
   reasonable: {
@@ -32,6 +32,11 @@ const MODES = {
     label: "Politics",
     geography: "Brussels first; Antwerp and wider Belgium when the role has strong international, EU, NATO, policy, public-affairs or defence relevance.",
     focus: "Prestigious English-speaking roles connecting banking/fintech/technology experience with an International Relations degree. Search EU institutions and agencies, NATO-related organisations, UN-linked bodies, think tanks, trade associations, public affairs, government relations, policy institutes, lobbying/public-policy consultancies, international organisations, defence/security companies, financial-services federations and policy-facing teams in banks, fintech and payments. Strong titles include Policy Advisor, EU Affairs, Public Affairs, Government Affairs, Regulatory Strategy, Institutional Relations, Geopolitical or Strategic Risk, Financial Services Policy, Defence Policy, Programme Officer, Stakeholder Relations and Strategic Partnerships. Prioritise prestige, senior stakeholder exposure, network-building and international visibility. Reject roles fundamentally requiring a legal/diplomatic career, research doctorate, active security clearance or mandatory fluent Dutch/French."
+  },
+  ai: {
+    label: "AI",
+    geography: "Belgium-wide. Prioritise Antwerp, Brussels, Mechelen, Ghent and Leuven. Hybrid roles based in Belgium are welcome.",
+    focus: "Current English-speaking AI-related roles with strong growth potential and a credible fit to this candidate. Prioritise AI Operations, AI Product Operations, AI Product Manager, AI Transformation, GenAI Programme or Project roles, AI Strategy, AI Governance, Responsible AI, AI Risk, AI Adoption, AI Enablement, AI Solutions, AI Business Operations, AI Customer Success, AI Partnerships, AI Implementation, AI Consulting, AI/Data Transformation and AI-enabled fintech or banking roles. The candidate has an MSc in Information Technologies with machine-learning focus, strong data/analytics exposure, banking and IT-risk experience, IAM/security knowledge, operational ownership, stakeholder management, entrepreneurship, and hands-on experience building AI/API/GitHub/Railway web workflows. Prefer roles where technical literacy, business judgement, process design, implementation and stakeholder leadership matter more than being a full-time software engineer or research scientist. Pure ML research, PhD-level research, highly specialised model-training engineering and roles requiring deep production coding as a hard requirement should normally be rejected. Favour credible scale-ups, technology companies, banks/fintechs, consultancies and international firms where AI is a strategic growth area and the role can create a path toward AI product, transformation, operations or leadership."
   }
 };
 
@@ -39,10 +44,10 @@ const CANDIDATE = `Candidate profile:
 - Based in Kapellen, Belgium.
 - 12+ years across banking, internal audit, fraud investigation, internal control, IAM/access operations, IT risk/security and fintech-related work.
 - Current employer: ING Belgium.
-- Bachelor's degrees in Business Administration and International Relations; MSc in Information Technologies.
+- Bachelor's degrees in Business Administration and International Relations; MSc in Information Technologies with machine-learning focus.
 - Certifications include CISA, CIA, CIAM, CFE, CFSA and CMB3.
 - Entrepreneurial experience: boutique dog hotel and interior/renovation venture.
-- Highly tech-savvy and builds AI/web-app workflows using APIs, GitHub and Railway.
+- Highly tech-savvy and builds AI/web-app workflows using OpenAI APIs, GitHub and Railway; comfortable combining business processes, data analysis and AI automation.
 - Prefers dynamic ownership, people contact, planning, coordination, visible impact and international environments.
 - English fluent. Dutch is still developing. Mandatory fluent Dutch or French is normally a rejection criterion.`;
 
