@@ -1,7 +1,7 @@
-const MODES={reasonable:{title:"Reasonable",hint:"Balanced, dynamic next step."},creative:{title:"Creative",hint:"Niche, hands-on, dream-job territory."},corporate:{title:"Corporate",hint:"Prestige, compensation, career leverage."},politics:{title:"Politics",hint:"Policy, institutions, influence and international network."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."}};
-const STORAGE_KEY="ujob:data";let state=loadState();let activeMode=state.activeMode||"reasonable";let activeView=state.activeView||activeMode;const modeStatus={reasonable:"",creative:"",corporate:"",politics:"",ai:""};const pollTimers={reasonable:null,creative:null,corporate:null,politics:null,ai:null};
+const MODES={reasonable:{title:"Reasonable",hint:"Balanced, dynamic next step."},creative:{title:"Creative",hint:"Niche, hands-on, dream-job territory."},corporate:{title:"Corporate",hint:"Prestige, compensation, career leverage."},politics:{title:"Politics",hint:"Policy, institutions, influence and international network."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},prestige:{title:"Prestige",hint:"Reputation, institutions and international influence."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."}};
+const STORAGE_KEY="ujob:data";let state=loadState();let activeMode=state.activeMode||"reasonable";let activeView=state.activeView||activeMode;const modeStatus={reasonable:"",creative:"",corporate:"",politics:"",ai:"",prestige:"",highpaid:""};const pollTimers={reasonable:null,creative:null,corporate:null,politics:null,ai:null,prestige:null,highpaid:null};
 const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount")};
-function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}function emptyState(){return{activeMode:"reasonable",activeView:"reasonable",actions:{},reasonable:blankMode(),creative:blankMode(),corporate:blankMode(),politics:blankMode(),ai:blankMode()}}function mergeRuns(a,b){const seen=new Set();return[...(a||[]),...(b||[])].filter(r=>r&&r.at&&Array.isArray(r.jobs)).sort((x,y)=>new Date(y.at)-new Date(x.at)).filter(r=>{const k=r.at+"|"+r.jobs.map(j=>j.url||j.title||"").join("|");if(seen.has(k))return false;seen.add(k);return true}).slice(0,250)}function mergeState(base,raw){if(!raw||typeof raw!=="object")return base;const out={...base};if(raw.activeMode&&MODES[raw.activeMode])out.activeMode=raw.activeMode;if(raw.activeView&&(MODES[raw.activeView]||raw.activeView==="actions"))out.activeView=raw.activeView;out.actions={...(base.actions||{}),...(raw.actions||{})};for(const mode of Object.keys(MODES)){const a=out[mode]||blankMode();const b=raw[mode]||blankMode();const at=a.lastUpdate?new Date(a.lastUpdate).getTime():0;const bt=b.lastUpdate?new Date(b.lastUpdate).getTime():0;out[mode]={lastUpdate:bt>at?b.lastUpdate:a.lastUpdate,latest:bt>at?(Array.isArray(b.latest)?b.latest:[]):(Array.isArray(a.latest)?a.latest:[]),runs:mergeRuns(a.runs,b.runs),pendingSearch:b.pendingSearch||a.pendingSearch||null}}return out}function loadState(){let merged=emptyState();try{const stable=localStorage.getItem(STORAGE_KEY);if(stable)merged=mergeState(merged,JSON.parse(stable))}catch{}try{for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||key===STORAGE_KEY||!key.startsWith("ujob:"))continue;try{merged=mergeState(merged,JSON.parse(localStorage.getItem(key)||"{}"))}catch{}}}catch{}try{localStorage.setItem(STORAGE_KEY,JSON.stringify(merged))}catch{}return merged}
+function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}function emptyState(){return{activeMode:"reasonable",activeView:"reasonable",actions:{},reasonable:blankMode(),creative:blankMode(),corporate:blankMode(),politics:blankMode(),ai:blankMode(),prestige:blankMode(),highpaid:blankMode()}}function mergeRuns(a,b){const seen=new Set();return[...(a||[]),...(b||[])].filter(r=>r&&r.at&&Array.isArray(r.jobs)).sort((x,y)=>new Date(y.at)-new Date(x.at)).filter(r=>{const k=r.at+"|"+r.jobs.map(j=>j.url||j.title||"").join("|");if(seen.has(k))return false;seen.add(k);return true}).slice(0,250)}function mergeState(base,raw){if(!raw||typeof raw!=="object")return base;const out={...base};if(raw.activeMode&&MODES[raw.activeMode])out.activeMode=raw.activeMode;if(raw.activeView&&(MODES[raw.activeView]||raw.activeView==="actions"))out.activeView=raw.activeView;out.actions={...(base.actions||{}),...(raw.actions||{})};for(const mode of Object.keys(MODES)){const a=out[mode]||blankMode();const b=raw[mode]||blankMode();const at=a.lastUpdate?new Date(a.lastUpdate).getTime():0;const bt=b.lastUpdate?new Date(b.lastUpdate).getTime():0;out[mode]={lastUpdate:bt>at?b.lastUpdate:a.lastUpdate,latest:bt>at?(Array.isArray(b.latest)?b.latest:[]):(Array.isArray(a.latest)?a.latest:[]),runs:mergeRuns(a.runs,b.runs),pendingSearch:b.pendingSearch||a.pendingSearch||null}}return out}function loadState(){let merged=emptyState();try{const stable=localStorage.getItem(STORAGE_KEY);if(stable)merged=mergeState(merged,JSON.parse(stable))}catch{}try{for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||key===STORAGE_KEY||!key.startsWith("ujob:"))continue;try{merged=mergeState(merged,JSON.parse(localStorage.getItem(key)||"{}"))}catch{}}}catch{}try{localStorage.setItem(STORAGE_KEY,JSON.stringify(merged))}catch{}return merged}
 function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}function esc(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}
 function fmtDate(value,withTime=false){if(!value)return"Not run yet";return new Intl.DateTimeFormat("en-BE",withTime?{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}:{day:"2-digit",month:"short",year:"numeric"}).format(new Date(value))}function renderToday(){if(!els.today)return;els.today.textContent=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Brussels",day:"2-digit",month:"long",year:"numeric"}).format(new Date())}
 function seenUrlsForMode(mode){return (state[mode]?.runs||[]).flatMap(run=>run.jobs.map(j=>j.url)).filter(Boolean)}
@@ -37,7 +37,7 @@ function appliedControl(job,mode,history=false){
   const key=actionKey(job);
   if(!key)return"";
   const checked=state.actions?.[key]?" checked":"";
-  return `<label class="applied-control${history?" history-applied":""}"><input type="checkbox" data-applied-key="${esc(key)}" data-mode="${esc(mode||"")}"${checked}><span>Applied</span></label>`;
+  return `<label class="applied-control${history?" history-applied":""}"><input type="checkbox" data-applied-key="${esc(key)}" data-mode="${esc(mode||"")}"${checked}><span>Watch</span></label>`;
 }
 function bindAppliedControls(root){
   root.querySelectorAll("input[data-applied-key]").forEach(input=>{
@@ -78,10 +78,10 @@ function showActions(){
 }
 function renderActions(){
   const jobs=Object.values(state.actions||{}).sort((a,b)=>new Date(b.appliedAt||0)-new Date(a.appliedAt||0));
-  els.title.textContent="Actions";
-  els.hint.textContent="Roles you applied to or contacted.";
+  els.title.textContent="Watchlist";
+  els.hint.textContent="Roles you want to follow or act on.";
   els.lastUpdate.textContent="";
-  els.status.textContent=jobs.length?String(jobs.length)+" actioned role"+(jobs.length===1?"":"s")+".":"";
+  els.status.textContent=jobs.length?String(jobs.length)+" watched role"+(jobs.length===1?"":"s")+".":"";
   els.historyWrap.hidden=true;
   els.actionsCount.textContent=String(jobs.length);
   renderActionResults(jobs);
@@ -120,7 +120,7 @@ function renderResults(jobs,mode){
 }
 function renderActionResults(jobs){
   if(!jobs.length){
-    els.results.innerHTML='<div class="empty">Tick Applied on any vacancy to keep it here.</div>';
+    els.results.innerHTML='<div class="empty">Tick Watch on any vacancy to keep it here.</div>';
     return;
   }
   els.results.innerHTML=jobs.map(job=>`<article class="job action-job action-compact">
@@ -311,5 +311,5 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=30",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=31",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));els.actionsButton?.addEventListener("click",showActions);els.run.addEventListener("click",runSearch);els.historyToggle.addEventListener("click",()=>{const opening=els.history.hidden;els.history.hidden=!opening;els.historyToggle.setAttribute("aria-expanded",String(opening))});document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")resumePendingSearches()});window.addEventListener("focus",resumePendingSearches);renderToday();setInterval(renderToday,60000);if(activeView==="actions")showActions();else setMode(activeMode);checkHealth();resumePendingSearches();
