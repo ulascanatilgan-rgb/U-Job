@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "2.8.0-ai-mode";
+const APP_VERSION = "2.9.0-prestige-highpaid-watchlist";
 
 const MODES = {
   reasonable: {
@@ -37,6 +37,16 @@ const MODES = {
     label: "AI",
     geography: "Belgium-wide. Prioritise Antwerp, Brussels, Mechelen, Ghent and Leuven. Hybrid roles based in Belgium are welcome.",
     focus: "Current English-speaking AI-related roles with strong growth potential and a credible fit to this candidate. Prioritise AI Operations, AI Product Operations, AI Product Manager, AI Transformation, GenAI Programme or Project roles, AI Strategy, AI Governance, Responsible AI, AI Risk, AI Adoption, AI Enablement, AI Solutions, AI Business Operations, AI Customer Success, AI Partnerships, AI Implementation, AI Consulting, AI/Data Transformation and AI-enabled fintech or banking roles. The candidate has an MSc in Information Technologies with machine-learning focus, strong data/analytics exposure, banking and IT-risk experience, IAM/security knowledge, operational ownership, stakeholder management, entrepreneurship, and hands-on experience building AI/API/GitHub/Railway web workflows. Prefer roles where technical literacy, business judgement, process design, implementation and stakeholder leadership matter more than being a full-time software engineer or research scientist. Pure ML research, PhD-level research, highly specialised model-training engineering and roles requiring deep production coding as a hard requirement should normally be rejected. Favour credible scale-ups, technology companies, banks/fintechs, consultancies and international firms where AI is a strategic growth area and the role can create a path toward AI product, transformation, operations or leadership."
+  },
+  prestige: {
+    label: "Prestige",
+    geography: "Belgium only, with Brussels as the main hub and Antwerp acceptable for strong institutional or international roles.",
+    focus: "Highly respected, internationally connected and reputation-building roles where the employer, institution or stakeholder network can materially strengthen the candidate's long-term profile. Search NATO and NATO-adjacent organisations, EU institutions and agencies, European or Belgian government-linked bodies, commissions, chambers of commerce, international trade bodies, embassies and diplomatic missions, royal-household or royal-foundation related organisations when publicly recruiting, defence and security organisations, law-enforcement or security-policy bodies, intelligence/security consultancies and contractors, geopolitical-risk firms, international organisations, federations, major think tanks, public-affairs organisations, strategic partnerships teams and prestigious policy-facing institutions. Prioritise programme management, operations, institutional relations, stakeholder management, security governance, strategic risk, partnerships, policy implementation, business management and coordination roles that can realistically use the candidate's banking, audit, fraud, IAM/security, International Relations, technology and stakeholder background. Reject positions that require Belgian nationality, sworn police/military status, an already-active security clearance, native Dutch/French, a diplomatic career track or specialist legal/research credentials that the candidate does not have. Prestige and international-network value should influence the fit score, but realistic eligibility is mandatory."
+  },
+  highpaid: {
+    label: "High Paid",
+    geography: "Belgium-wide, prioritising Antwerp and Brussels; hybrid Belgium-based roles are welcome.",
+    focus: "Roles likely to move the candidate materially upward in total compensation, seniority and financial trajectory. Search senior manager, lead, head-of, business manager, chief-of-staff, transformation, strategic operations, programme leadership, AI transformation, product operations, fintech/payments, banking, technology, cybersecurity governance, risk-tech, financial-crime technology, consulting, investment operations and high-value client or partnership roles. Prefer employers and sectors known for strong compensation, bonus, mobility/car benefits, equity or rapid salary progression. When salary is not published, infer earning potential conservatively from seniority, employer quality, scope, market segment and responsibility; never invent a salary number. Fit score should combine candidate match with realistic compensation upside and career leverage. Reject junior roles, narrow back-office work, jobs with major must-have gaps, or positions requiring mandatory fluent Dutch/French."
   }
 };
 
@@ -180,8 +190,8 @@ GEOGRAPHY:
 ${cfg.geography}
 
 RULES:
-1. Find and verify up to 10 promising vacancies so the backend can select the best 5 after final checks. Aim for at least 8 verified candidates whenever possible.
-2. RETURN EXACTLY 5 RESULTS whenever five valid live vacancies can be found. Use this search ladder in order and stop once five verified roles are available:
+1. Search broadly and deeply, then verify up to 12 promising vacancies so the backend can select the strongest 5. A minimum of 3 verified live vacancies is a priority for every run whenever three valid roles exist.
+2. Return 5 results whenever five valid live vacancies can be found; never return fewer than 3 if at least three valid roles exist. Use this search ladder in order and keep widening until at least 3 are verified, then continue toward 5:
    TIER A: published in the last 7 days, preferred geography and exact mode fit.
    TIER B: last 14 days, widen geography across Belgium.
    TIER C: last 30 days, include adjacent but still clearly relevant titles/sectors.
@@ -192,9 +202,9 @@ RULES:
 5. English must be sufficient for doing the job. Reject roles that require fluent/professional Dutch or French. Do not assume English is sufficient just because the ad is written in English.
 6. Prefer the employer's official career page or active ATS direct vacancy page. A generic careers homepage or stale aggregator is not an acceptable final link.
 7. Check the actual requirements against this candidate profile. Return only meaningfully relevant roles with a fit score of at least 6.5/10. Reject roles with a major must-have gap.
-8. For each candidate, do a separate verification search using company + exact title where needed. Cross-check both (a) current live status and (b) posting date. Do not rely on an old search-engine snippet alone.
+8. Search across multiple source classes, not one job board only. Where relevant use: official employer or institution career pages; direct ATS pages such as Workday, Greenhouse, Lever or SmartRecruiters; public-sector/institutional vacancy portals; recognised recruiter/HR agency listings; and major current job platforms. For prestige mode, actively inspect institutional and organisation career sites. For high-paid mode, also inspect executive/senior recruiter portals and employer career sites. For each candidate, separately cross-check (a) current live status, (b) exact posting date, and (c) language requirements. Do not rely on an old search-engine snippet alone.
 9. NEVER REPEAT entries remain excluded. For ALREADY SEEN URLs, prefer new/unseen roles first; however, if fewer than five unseen verified live roles exist, previously seen URLs may be reused to fill the list to exactly five.
-10. Keep searching through the freshness/geography ladder until you have exactly five verified roles whenever five valid live roles exist. Never invent jobs, dates, companies, language requirements or URLs.
+10. Keep searching through the freshness/geography/source ladder until you have at least 3 verified roles whenever three valid roles exist, and continue toward 5. Never invent jobs, dates, companies, compensation, language requirements or URLs.
 
 NEVER REPEAT:
 ${NEVER_REPEAT.join("\n")}
@@ -275,7 +285,7 @@ Before returning ANY vacancy:
 - If the page is unavailable, expired, archived, removed, 404, redirects to a generic careers page, or says no longer accepting applications, REJECT it.
 - Confirm English is sufficient. Mandatory fluent/professional Dutch or French means REJECT.
 - The role must have genuine fit to the candidate and score at least 6.5/10.
-- Find and verify up to 10 strong candidates so the backend can select the best five.
+- Search multiple source classes and find up to 12 strong candidates so the backend can select the best five. Prioritise getting at least 3 genuinely verified live roles whenever available.
 - Prefer unseen roles, but previously seen still-live roles may fill remaining slots.
 - Never include a closed, language-mismatched or clearly irrelevant vacancy just to reach five.
 
@@ -400,7 +410,7 @@ async function startSearch(req, res) {
         store: true,
         tools: [{
           type: "web_search",
-          search_context_size: "medium",
+          search_context_size: "high",
           user_location: {
             type: "approximate",
             country: "BE",
@@ -411,7 +421,7 @@ async function startSearch(req, res) {
         }],
         tool_choice: "required",
         input: strictPrompt,
-        max_output_tokens: 5200
+        max_output_tokens: 6400
       })
     });
 
