@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.1.0-linkedin-mode";
+const APP_VERSION = "3.2.0-global-remote";
 
 const MODES = {
   reasonable: {
@@ -47,6 +47,11 @@ const MODES = {
     label: "LinkedIn",
     geography: "Belgium only. Prioritise Antwerp and Brussels, then the rest of Belgium. Hybrid Belgium-based roles are welcome.",
     focus: "LinkedIn-only discovery mode for the strongest current opportunities for this candidate. Search LinkedIn job postings published within the LAST 7 DAYS ONLY. Prioritise roles where the candidate can plausibly be a top-tier applicant and enjoy the work: Business Operations Manager, Strategy & Operations, Chief of Staff, Business Manager, Product Operations, Customer/Client Operations, fintech/payments operations, programme or transformation leadership, founder/executive right-hand, partnerships, implementation and other high-ownership cross-functional roles. Strongly value dynamic teams, people contact, autonomy, visible impact, international exposure, energetic scale-up or quality corporate environments, and work that is not repetitive back-office administration. Also prioritise compensation upside, seniority, strong employers and roles that can materially improve career trajectory. Use banking, fintech, audit/control, IAM/security, operations, stakeholder management, entrepreneurship, MSc IT/ML and hands-on AI workflow experience as evidence of fit. Avoid roles with major must-have gaps, junior roles, narrow IAM administration, pure repetitive compliance work, mandatory fluent Dutch/French, or roles unlikely to offer meaningful ownership or progression."
+  },
+  global: {
+    label: "Global",
+    geography: "Remote roles that explicitly allow work from Belgium, the EU, Europe or EMEA. Prefer employers headquartered in the United States, United Kingdom, Switzerland or other globally prestigious markets, while requiring real eligibility for a Belgium-based candidate.",
+    focus: "Exceptional international remote opportunities worth leaving a safe local role for. Prioritise prestigious, famous, high-growth or category-leading companies, financial institutions, technology companies, AI firms, fintech/payments companies, security/cyber firms, international organisations, globally respected consultancies and other elite employers. Strong role families include Business Operations, Strategy & Operations, Chief of Staff, Business Manager, Product Operations, AI/Transformation Operations, Programme Leadership, Strategic Partnerships, Customer/Client Operations, Implementation, Risk/Security Governance, fintech/payments operations and cross-functional leadership. The candidate should have a realistic chance to stand out because of the combination of 12+ years in banking/audit/fraud/controls/IAM/security, operational ownership, stakeholder management, entrepreneurship, MSc IT/ML, certifications and hands-on AI/API workflow building. Prefer roles that could move the candidate several steps forward in compensation, brand prestige, global network, responsibility, future optionality or access to high-growth sectors. Travel is acceptable. Remote-first or distributed European teams are ideal. Reject ordinary low-upside remote jobs, location-restricted US-only/UK-only/Swiss-only roles, contractor roles that cannot legally engage someone based in Belgium, junior positions, deep specialist engineering/research roles with major skill gaps, and any role requiring another language beyond English."
   },
   turkish: {
     label: "Turkish",
@@ -163,6 +168,7 @@ function cleanJob(job) {
     url: normalizeUrl(job?.url),
     publishedDate: String(job?.publishedDate || "").trim(),
     languageCheck: String(job?.languageCheck || "").trim(),
+    remoteCheck: String(job?.remoteCheck || "").trim(),
     score: Math.round(Math.max(0, Math.min(10, Number(job?.score) || 0)) * 10) / 10,
     whyFit: Array.isArray(job?.whyFit)
       ? job.whyFit.slice(0, 3).map(v => String(v).trim()).filter(Boolean)
@@ -181,7 +187,7 @@ function buildPrompt(mode, seenUrls) {
 
   const seen = seenUrls.slice(-250).map(normalizeUrl).filter(Boolean);
 
-  return `Perform live web searches for CURRENT job vacancies in Belgium.
+  return `Perform live web searches for ${mode === "global" ? "CURRENT international remote job vacancies that explicitly accept candidates based in Belgium/Europe" : "CURRENT job vacancies in Belgium"}.
 
 Today: ${today}
 Mode: ${cfg.label}
@@ -203,20 +209,39 @@ ${mode === "linkedin" ? `LINKEDIN MODE — HARD RULES:
 - WHY_FIT_1 should explain profile fit; WHY_FIT_2 should explain why the work environment/scope may be energising and enjoyable; WHY_FIT_3 should explain compensation/career-leverage potential without inventing salary.
 ` : ""}
 
+${mode === "global" ? `GLOBAL MODE — HARD RULES:
+- Return only REMOTE or distributed roles that explicitly allow the person to work while based in Belgium, EU, Europe or EMEA.
+- "Remote" is NOT enough. Reject US-only, UK-only, Switzerland-only, country-restricted or location-ambiguous remote roles unless Belgium/Europe eligibility is explicitly verified.
+- Prefer employers headquartered in the US, UK, Switzerland or other prestigious global hubs, but the employing entity/team must be able to engage a Belgium-based candidate.
+- The role must be meaningfully exceptional: strong global brand or institutional prestige, unusually strong compensation/career leverage, high-growth future relevance, rare responsibility/scope, or a combination of these.
+- Search for European/EMEA teams inside global companies, remote-first companies with European employment, and internationally distributed teams.
+- Travel requirements are acceptable.
+- Search deeply across official global career pages, ATS systems, executive/specialist recruiters, remote-Europe job boards, fintech/AI/technology job boards, international-organisation portals and reputable current platforms.
+- Verify remote-location eligibility separately from job fit. Output REMOTE_CHECK describing exactly why Belgium/Europe-based work is permitted.
+- Score only realistic opportunities. A famous employer is not enough if the candidate has a major must-have gap.
+- Aim for 5 verified roles by checking up to 16 serious candidates, but never invent or weaken eligibility rules just to reach five.
+- WHY_FIT_1: explain why this candidate could stand out.
+- WHY_FIT_2: explain why the employer/role is unusually prestigious, high-growth, high-paying or career-accelerating.
+- WHY_FIT_3: explain why this remote role is worth considering versus an ordinary Belgium-based move.
+` : ""}
+
 RULES:
-1. Search broadly and deeply across multiple source types, then verify up to 12 promising vacancies so the backend can select the strongest 5. Return up to 5 final roles; there is no minimum count. Quality, recency and verification are more important than filling the list.
+1. Search broadly and deeply across multiple source types, then verify ${mode === "global" ? "up to 16" : "up to 12"} promising vacancies so the backend can select the strongest 5. Return up to 5 final roles; there is no minimum count. Quality, recency and verification are more important than filling the list.
 2. Return up to 5 results. Use this search ladder in order and continue only while additional roles remain genuinely relevant and verifiable:
-   TIER A: published in the last 7 days, preferred geography and exact mode fit.
+${mode === "global" ? `   TIER A: published in the last 7 days, exceptional fit, Europe/EMEA remote eligibility explicitly confirmed.
+   TIER B: last 14 days, widen across prestigious US/UK/Swiss/global employers with verified Europe/EMEA remote hiring.
+   TIER C: last 30 days, include adjacent high-upside role families only when Belgium/Europe eligibility and live status are explicit.
+   Do not use postings older than 30 days in Global mode.` : `   TIER A: published in the last 7 days, preferred geography and exact mode fit.
    TIER B: last 14 days, widen geography across Belgium.
    TIER C: last 30 days, include adjacent but still clearly relevant titles/sectors.
-   TIER D: up to 60 days old only when the vacancy is demonstrably still live and accepting applications now.
+   TIER D: up to 60 days old only when the vacancy is demonstrably still live and accepting applications now.`}
    Never use an older posting merely because it is indexed; live status must be verified.
 3. A precise publication date is mandatory. Verify it from the live vacancy/ATS page, employer metadata, or a reliable current dated vacancy source. If you cannot establish an exact YYYY-MM-DD date, exclude it.
 4. The vacancy must be currently open and accepting applications. Ignore cached, archived, expired, removed, filled, unavailable, 404, or "no longer accepting applications" pages.
 5. English must be sufficient for doing the job. Reject roles that require fluent/professional Dutch or French. Do not assume English is sufficient just because the ad is written in English.
 6. Prefer the employer's official career page or active ATS direct vacancy page. A generic careers homepage or stale aggregator is not an acceptable final link.
 7. Check the actual requirements against this candidate profile. Return only meaningfully relevant roles with a fit score of at least 6.5/10. Reject roles with a major must-have gap.
-8. Search across multiple source classes and query families, not one job board only. Use official employer/institution career pages, direct ATS pages such as Workday/Greenhouse/Lever/SmartRecruiters, public-sector or institutional vacancy portals, recognised recruiter/HR agency listings, specialist sector job boards and major current job platforms. For Prestige actively inspect institutional, policy, banking-association, central-bank, think-tank, EU/NATO-adjacent and international-organisation career sites. For Corporate search bank career pages intensively. For Reasonable search fintech/payments/scale-up career pages intensively. For Turkish search both Turkey-linked employers and Belgian employers with Turkey-market exposure. For High Paid also inspect executive/senior recruiter portals. For each candidate separately cross-check (a) current live status, (b) exact posting date, (c) language requirements and (d) direct application availability. Do not rely on an old search-engine snippet alone.
+8. Search across multiple source classes and query families, not one job board only. Use official employer/institution career pages, direct ATS pages such as Workday/Greenhouse/Lever/SmartRecruiters, public-sector or institutional vacancy portals, recognised recruiter/HR agency listings, specialist sector job boards and major current job platforms. For Prestige actively inspect institutional, policy, banking-association, central-bank, think-tank, EU/NATO-adjacent and international-organisation career sites. For Corporate search bank career pages intensively. For Reasonable search fintech/payments/scale-up career pages intensively. For Turkish search both Turkey-linked employers and Belgian employers with Turkey-market exposure. For High Paid also inspect executive/senior recruiter portals. For Global search international employer career pages plus Europe/EMEA-remote specialist sources and explicitly verify Belgium/Europe employment eligibility. For each candidate separately cross-check (a) current live status, (b) exact posting date, (c) language requirements and (d) direct application availability. Do not rely on an old search-engine snippet alone.
 9. NEVER REPEAT entries remain excluded. For ALREADY SEEN URLs, prefer new/unseen roles first; however, if fewer than five unseen verified live roles exist, previously seen URLs may be reused to fill the list to exactly five.
 10. Search the freshness/geography/source ladder thoroughly and return the best 0–5 verified roles. Never weaken the rules merely to increase the count. Never invent jobs, dates, companies, compensation, language requirements or URLs.
 
@@ -228,10 +253,10 @@ ${seen.length ? seen.join("\n") : "None"}
 
 After completing the web research, return only vacancies that pass every rule.
 For each accepted vacancy include these exact fields on separate lines:
-TITLE, COMPANY, LOCATION, DIRECT_URL, PUBLISHED_DATE, LANGUAGE_CHECK, SCORE, WHY_FIT_1, WHY_FIT_2, WHY_FIT_3.
+TITLE, COMPANY, LOCATION, DIRECT_URL, PUBLISHED_DATE, LANGUAGE_CHECK, REMOTE_CHECK, SCORE, WHY_FIT_1, WHY_FIT_2, WHY_FIT_3.
 Always write the full direct vacancy URL explicitly as plain text.
 PUBLISHED_DATE must be exact YYYY-MM-DD.
-LANGUAGE_CHECK must explicitly confirm that English is sufficient and that Dutch/French is not mandatory.
+LANGUAGE_CHECK must explicitly confirm that English is sufficient and that Dutch/French is not mandatory. For Global mode, REMOTE_CHECK must explicitly confirm that a Belgium-based candidate can work remotely in the role; for other modes write REMOTE_CHECK: N/A.
 Do not use markdown tables.
 If any required fact cannot be verified, exclude that vacancy rather than writing unknown.`;
 }
@@ -267,6 +292,7 @@ function parseVerifiedJobs(text) {
       url: fields.DIRECT_URL || "",
       publishedDate: fields.PUBLISHED_DATE || "",
       languageCheck: fields.LANGUAGE_CHECK || "",
+      remoteCheck: fields.REMOTE_CHECK || "",
       score: Number.isFinite(score) ? score : 0,
       whyFit
     });
@@ -295,13 +321,16 @@ Before returning ANY vacancy:
 - Confirm an exact publication/posting date from a credible source. Prefer vacancy/ATS metadata; if needed cross-check a reliable dated source.
 ${mode === "linkedin"
   ? "- LINKEDIN MODE: publication date MUST be within the last 7 days. Never widen beyond 7 days. The final URL must be a specific LinkedIn job posting."
-  : "- Prefer the last 7 days. If fewer than five pass, widen to 14 days, then 30 days, then at most 60 days."}
+  : mode === "global"
+    ? "- GLOBAL MODE: prefer the last 7 days, then 14 days, then at most 30 days. Never accept a Global posting older than 30 days."
+    : "- Prefer the last 7 days. If fewer than five pass, widen to 14 days, then 30 days, then at most 60 days."}
 - Every accepted vacancy must still be live and accepting applications today.
 - If exact date cannot be established as YYYY-MM-DD, REJECT it.
 - If the page is unavailable, expired, archived, removed, 404, redirects to a generic careers page, or says no longer accepting applications, REJECT it.
 - Confirm English is sufficient. Mandatory fluent/professional Dutch or French means REJECT.
-- The role must have genuine fit to the candidate and score at least 6.5/10.
-- Search multiple source classes and find up to 12 strong candidates so the backend can select the best five. There is no minimum result count; verification and relevance take priority.
+- The role must have genuine fit to the candidate and score at least ${mode === "global" ? "7.5" : "6.5"}/10.
+${mode === "global" ? "- GLOBAL MODE: independently verify remote eligibility from Belgium/Europe/EMEA. If this is ambiguous, REJECT the role." : ""}
+- Search multiple source classes and find ${mode === "global" ? "up to 16" : "up to 12"} strong candidates so the backend can select the best five. There is no minimum result count; verification and relevance take priority.
 - Prefer unseen roles, but previously seen still-live roles may fill remaining slots.
 - Never include a closed, language-mismatched or clearly irrelevant vacancy just to reach five.
 
@@ -316,6 +345,7 @@ LOCATION: ...
 DIRECT_URL: https://...
 PUBLISHED_DATE: YYYY-MM-DD
 LANGUAGE_CHECK: English sufficient; Dutch/French not mandatory.
+REMOTE_CHECK: ${mode === "global" ? "Belgium/Europe/EMEA remote eligibility verified: ..." : "N/A"}
 SCORE: 8.7
 WHY_FIT_1: ...
 WHY_FIT_2: ...
@@ -345,7 +375,7 @@ function isAllowedPublishedDate(value, mode = "") {
   const today = Date.UTC(ty, tm - 1, td);
   const ageDays = (today - published) / 86400000;
 
-  const maxAgeDays = mode === "linkedin" ? 7 : 60;
+  const maxAgeDays = mode === "linkedin" ? 7 : mode === "global" ? 30 : 60;
   return Number.isFinite(ageDays) && ageDays >= 0 && ageDays <= maxAgeDays;
 }
 
@@ -356,6 +386,14 @@ function isLinkedInJobUrl(value) {
   } catch {
     return false;
   }
+}
+
+function hasVerifiedEuropeRemote(job) {
+  const check = String(job?.remoteCheck || "");
+  if (!check) return false;
+  const allowed = /\b(belgium|europe|european union|eu|emea)\b/i.test(check);
+  const restrictedOnly = /\b(us|united states|uk|united kingdom|switzerland)\s*[- ]?only\b/i.test(check);
+  return allowed && !restrictedOnly;
 }
 
 function finalizeJobsFromResponse(data, mode = "") {
@@ -372,8 +410,9 @@ function finalizeJobsFromResponse(data, mode = "") {
     .map(cleanJob)
     .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url) && job.whyFit.length === 3)
     .filter(job => isAllowedPublishedDate(job.publishedDate, mode))
-    .filter(job => job.score >= 6.5)
+    .filter(job => job.score >= (mode === "global" ? 7.5 : 6.5))
     .filter(job => mode !== "linkedin" || isLinkedInJobUrl(job.url))
+    .filter(job => mode !== "global" || hasVerifiedEuropeRemote(job))
     .filter(job => {
       const lang = String(job.languageCheck || "");
       const cleaned = lang
