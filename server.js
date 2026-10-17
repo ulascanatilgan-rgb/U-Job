@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.0.0-focused-modes";
+const APP_VERSION = "3.1.0-linkedin-mode";
 
 const MODES = {
   reasonable: {
@@ -42,6 +42,11 @@ const MODES = {
     label: "High Paid",
     geography: "Belgium-wide, prioritising Antwerp and Brussels; hybrid Belgium-based roles are welcome.",
     focus: "Roles likely to move the candidate materially upward in total compensation, seniority and financial trajectory. Search senior manager, lead, head-of, business manager, chief-of-staff, transformation, strategic operations, programme leadership, AI transformation, product operations, fintech/payments, banking, technology, cybersecurity governance, risk-tech, financial-crime technology, consulting, investment operations and high-value client or partnership roles. Prefer employers and sectors known for strong compensation, bonus, mobility/car benefits, equity or rapid salary progression. When salary is not published, infer earning potential conservatively from seniority, employer quality, scope, market segment and responsibility; never invent a salary number. Fit score should combine candidate match with realistic compensation upside and career leverage. Reject junior roles, narrow back-office work, jobs with major must-have gaps, or positions requiring mandatory fluent Dutch/French."
+  },
+  linkedin: {
+    label: "LinkedIn",
+    geography: "Belgium only. Prioritise Antwerp and Brussels, then the rest of Belgium. Hybrid Belgium-based roles are welcome.",
+    focus: "LinkedIn-only discovery mode for the strongest current opportunities for this candidate. Search LinkedIn job postings published within the LAST 7 DAYS ONLY. Prioritise roles where the candidate can plausibly be a top-tier applicant and enjoy the work: Business Operations Manager, Strategy & Operations, Chief of Staff, Business Manager, Product Operations, Customer/Client Operations, fintech/payments operations, programme or transformation leadership, founder/executive right-hand, partnerships, implementation and other high-ownership cross-functional roles. Strongly value dynamic teams, people contact, autonomy, visible impact, international exposure, energetic scale-up or quality corporate environments, and work that is not repetitive back-office administration. Also prioritise compensation upside, seniority, strong employers and roles that can materially improve career trajectory. Use banking, fintech, audit/control, IAM/security, operations, stakeholder management, entrepreneurship, MSc IT/ML and hands-on AI workflow experience as evidence of fit. Avoid roles with major must-have gaps, junior roles, narrow IAM administration, pure repetitive compliance work, mandatory fluent Dutch/French, or roles unlikely to offer meaningful ownership or progression."
   },
   turkish: {
     label: "Turkish",
@@ -189,6 +194,15 @@ ${cfg.focus}
 GEOGRAPHY:
 ${cfg.geography}
 
+${mode === "linkedin" ? `LINKEDIN MODE — HARD RULES:
+- Search LinkedIn job postings specifically, using LinkedIn Jobs result pages/job-view pages as the discovery source.
+- Publication date must be within the last 7 calendar days inclusive. Do NOT widen beyond 7 days.
+- The final DIRECT_URL should be the specific LinkedIn job posting URL whenever it is accessible.
+- Verify the LinkedIn posting is still active. Cross-check company/title on the employer's official career/ATS page when possible, but keep the LinkedIn vacancy as the final link.
+- Rank toward roles where this candidate has unusually strong fit, high ownership, likely enjoyment/energy, strong compensation or career upside, and a realistic chance of standing out.
+- WHY_FIT_1 should explain profile fit; WHY_FIT_2 should explain why the work environment/scope may be energising and enjoyable; WHY_FIT_3 should explain compensation/career-leverage potential without inventing salary.
+` : ""}
+
 RULES:
 1. Search broadly and deeply across multiple source types, then verify up to 12 promising vacancies so the backend can select the strongest 5. Return up to 5 final roles; there is no minimum count. Quality, recency and verification are more important than filling the list.
 2. Return up to 5 results. Use this search ladder in order and continue only while additional roles remain genuinely relevant and verifiable:
@@ -261,7 +275,7 @@ function parseVerifiedJobs(text) {
   return { jobs };
 }
 
-function buildStrictPrompt(prompt) {
+function buildStrictPrompt(prompt, mode) {
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Brussels",
     year: "numeric",
@@ -279,7 +293,9 @@ Before returning ANY vacancy:
 - Open/check the exact current vacancy or ATS page.
 - Confirm the specific job is still live and accepting applications now.
 - Confirm an exact publication/posting date from a credible source. Prefer vacancy/ATS metadata; if needed cross-check a reliable dated source.
-- Prefer the last 7 days. If fewer than five pass, widen to 14 days, then 30 days, then at most 60 days.
+${mode === "linkedin"
+  ? "- LINKEDIN MODE: publication date MUST be within the last 7 days. Never widen beyond 7 days. The final URL must be a specific LinkedIn job posting."
+  : "- Prefer the last 7 days. If fewer than five pass, widen to 14 days, then 30 days, then at most 60 days."}
 - Every accepted vacancy must still be live and accepting applications today.
 - If exact date cannot be established as YYYY-MM-DD, REJECT it.
 - If the page is unavailable, expired, archived, removed, 404, redirects to a generic careers page, or says no longer accepting applications, REJECT it.
@@ -311,7 +327,7 @@ If nothing passes all checks, output exactly: NO_VERIFIED_JOBS
 `;
 }
 
-function isAllowedPublishedDate(value) {
+function isAllowedPublishedDate(value, mode = "") {
   const text = String(value || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
 
@@ -329,10 +345,20 @@ function isAllowedPublishedDate(value) {
   const today = Date.UTC(ty, tm - 1, td);
   const ageDays = (today - published) / 86400000;
 
-  return Number.isFinite(ageDays) && ageDays >= 0 && ageDays <= 60;
+  const maxAgeDays = mode === "linkedin" ? 7 : 60;
+  return Number.isFinite(ageDays) && ageDays >= 0 && ageDays <= maxAgeDays;
 }
 
-function finalizeJobsFromResponse(data) {
+function isLinkedInJobUrl(value) {
+  try {
+    const u = new URL(String(value || ""));
+    return /(^|\.)linkedin\.com$/i.test(u.hostname) && /\/jobs\/(view\/|collections\/|search\/)?/i.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function finalizeJobsFromResponse(data, mode = "") {
   const outputText = extractOutputText(data);
   if (!outputText) return [];
 
@@ -345,8 +371,9 @@ function finalizeJobsFromResponse(data) {
   return (Array.isArray(parsed.jobs) ? parsed.jobs : [])
     .map(cleanJob)
     .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url) && job.whyFit.length === 3)
-    .filter(job => isAllowedPublishedDate(job.publishedDate))
+    .filter(job => isAllowedPublishedDate(job.publishedDate, mode))
     .filter(job => job.score >= 6.5)
+    .filter(job => mode !== "linkedin" || isLinkedInJobUrl(job.url))
     .filter(job => {
       const lang = String(job.languageCheck || "");
       const cleaned = lang
@@ -399,7 +426,7 @@ async function startSearch(req, res) {
   if (!MODES[mode]) return sendJson(res, 400, { error: "Unknown mode." });
 
   const seenUrls = Array.isArray(body?.seenUrls) ? body.seenUrls.map(String) : [];
-  const strictPrompt = buildStrictPrompt(buildPrompt(mode, seenUrls));
+  const strictPrompt = buildStrictPrompt(buildPrompt(mode, seenUrls), mode);
 
   try {
     const data = await openAIRequest("https://api.openai.com/v1/responses", {
@@ -460,7 +487,7 @@ async function getSearchStatus(url, res) {
     const status = String(data?.status || "in_progress");
 
     if (status === "completed") {
-      const jobs = finalizeJobsFromResponse(data);
+      const jobs = finalizeJobsFromResponse(data, mode);
       const webSearchCalls = (data.output || []).filter(item => item?.type === "web_search_call").length;
 
       return sendJson(res, 200, {
