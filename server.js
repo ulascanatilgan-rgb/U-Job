@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.3.0-swmo-mode";
+const APP_VERSION = "3.3.1-eu-citizen-swmo";
 
 const MODES = {
   reasonable: {
@@ -56,7 +56,7 @@ const MODES = {
   swmo: {
     label: "SW-MO",
     geography: "Switzerland and Monaco only. Prioritise Zurich, Geneva, Basel, Zug, Lausanne and Monaco/Monte Carlo. On-site, hybrid or locally based roles are acceptable when international applicants can realistically be considered.",
-    focus: "High-quality Switzerland and Monaco opportunities where this candidate can realistically compete and enjoy the work. Prioritise strong-paying and career-enhancing employers in banking, private banking, wealth management, fintech/payments, technology, AI, cybersecurity/security governance, luxury, family offices, international organisations, global consultancies, strategic operations, business operations, Chief of Staff, business management, product/operations, programme leadership, partnerships, client operations and transformation. Prefer internationally oriented teams where English is the working language and the candidate's combination of 12+ years in banking/audit/fraud/controls/IAM/security, stakeholder management, operations, entrepreneurship, MSc IT/ML, certifications and hands-on AI/API workflow experience can stand out. Strongly value dynamic ownership, international exposure, client/stakeholder contact, visible impact, strong compensation and prestige. Reject roles requiring mandatory German, French, Italian or another language beyond English; reject local-only public-sector roles, highly specialised investment/front-office roles without transferable fit, deep engineering/research roles with major gaps, junior roles and vacancies whose work-authorisation requirements make the candidate clearly unrealistic."
+    focus: "High-quality Switzerland and Monaco opportunities where this candidate can realistically compete and enjoy the work. Prioritise strong-paying and career-enhancing employers in banking, private banking, wealth management, fintech/payments, technology, AI, cybersecurity/security governance, luxury, family offices, international organisations, global consultancies, strategic operations, business operations, Chief of Staff, business management, product/operations, programme leadership, partnerships, client operations and transformation. Prefer internationally oriented teams where English is the working language and the candidate's combination of 12+ years in banking/audit/fraud/controls/IAM/security, stakeholder management, operations, entrepreneurship, MSc IT/ML, certifications and hands-on AI/API workflow experience can stand out. Strongly value dynamic ownership, international exposure, client/stakeholder contact, visible impact, strong compensation and prestige. Reject roles requiring mandatory German, French, Italian or another language beyond English; reject local-only public-sector roles, highly specialised investment/front-office roles without transferable fit, deep engineering/research roles with major gaps, and junior roles. For Switzerland, do NOT treat lack of employer sponsorship as a blocker because the candidate is a Belgian/EU citizen; normal Swiss EU/EFTA registration/residence-permit formalities are acceptable. For Monaco, do not assume Belgian citizenship removes local work-authorisation formalities, but only reject when the vacancy explicitly restricts eligibility to Monaco/local residents or otherwise clearly excludes international EU applicants."
   },
   turkish: {
     label: "Turkish",
@@ -66,7 +66,7 @@ const MODES = {
 };
 
 const CANDIDATE = `Candidate profile:
-- Based in Kapellen, Belgium.
+- Based in Kapellen, Belgium; Belgian citizen and therefore an EU citizen.
 - 12+ years across banking, internal audit, fraud investigation, internal control, IAM/access operations, IT risk/security and fintech-related work.
 - Current employer: ING Belgium.
 - Bachelor's degrees in Business Administration and International Relations; MSc in Information Technologies with machine-learning focus.
@@ -74,7 +74,7 @@ const CANDIDATE = `Candidate profile:
 - Entrepreneurial experience: boutique dog hotel and interior/renovation venture.
 - Highly tech-savvy and builds AI/web-app workflows using OpenAI APIs, GitHub and Railway; comfortable combining business processes, data analysis and AI automation.
 - Prefers dynamic ownership, people contact, planning, coordination, visible impact and international environments.
-- English fluent. Dutch is still developing. Mandatory fluent Dutch or French is normally a rejection criterion.`;
+- English fluent. Dutch is still developing. Belgian/EU citizenship should be treated as a mobility advantage for EU/EEA-adjacent hiring and Switzerland. Mandatory fluent Dutch or French is normally a rejection criterion.`;
 
 const NEVER_REPEAT = [
   "Cross Chartering Yacht Transport — Operations & Documentation Coordinator",
@@ -235,12 +235,13 @@ ${mode === "swmo" ? `SW-MO MODE — HARD RULES:
 - Search Switzerland and Monaco only.
 - English must genuinely be sufficient for the role. Mandatory German, French, Italian or another language means REJECT.
 - Prefer international employers and teams accustomed to cross-border/international hiring.
-- Verify realistic candidate mobility. Check whether the role is open to international applicants, offers relocation/sponsorship, accepts EU/EEA/international profiles, or otherwise does not clearly exclude a Belgium-based applicant. If work-authorisation requirements clearly make the candidate ineligible, REJECT.
+- Candidate is a Belgian citizen (EU citizen). For Switzerland, treat this as a strong mobility advantage: do NOT require employer sponsorship and do NOT reject because the candidate is not already Swiss-resident. Standard EU/EFTA Swiss registration/residence-permit formalities are acceptable.
+- For Monaco, Belgian/EU citizenship is positive but does not automatically remove local work-authorisation formalities. Reject only when the vacancy explicitly requires Monaco residency/local status or clearly excludes international EU applicants.
 - Search official employer career pages, bank/private-bank career sites, fintech/technology companies, luxury/family-office employers, international organisations, specialist Swiss/Monaco recruiters and current ATS/job platforms.
 - Prioritise roles with strong compensation, career leverage, prestige and enjoyable high-ownership work.
 - A famous employer alone is not enough: the candidate must have a realistic transferable fit and a credible chance to compete.
 - Prefer last 7 days, then 14 days, then at most 30 days. Do not accept older postings.
-- Output MOBILITY_CHECK explaining why an international/Belgium-based applicant can realistically be considered.
+- Output MOBILITY_CHECK explaining why the Belgian/EU-citizen candidate can realistically be considered. For Swiss roles, confirm EU-citizen mobility rather than sponsorship. For Monaco, state any explicit local eligibility restriction if present.
 - WHY_FIT_1: explain why this candidate could be a strong applicant.
 - WHY_FIT_2: explain why the scope/work environment is likely to be engaging and enjoyable.
 - WHY_FIT_3: explain compensation, prestige or career-upside potential without inventing salary.
@@ -357,7 +358,7 @@ ${mode === "linkedin"
 - Confirm English is sufficient. Mandatory fluent/professional Dutch or French means REJECT.
 - The role must have genuine fit to the candidate and score at least ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : "6.5"}/10.
 ${mode === "global" ? "- GLOBAL MODE: independently verify remote eligibility from Belgium/Europe/EMEA. If this is ambiguous, REJECT the role." : ""}
-${mode === "swmo" ? "- SW-MO MODE: independently verify realistic international mobility/work-authorisation compatibility. If requirements clearly exclude the candidate, REJECT the role." : ""}
+${mode === "swmo" ? "- SW-MO MODE: candidate is a Belgian/EU citizen. For Switzerland, do not require employer sponsorship; standard EU/EFTA permit/registration formalities are acceptable. For Monaco, verify the vacancy does not explicitly restrict eligibility to local/Monaco residents or otherwise exclude international EU applicants." : ""}
 - Search multiple source classes and find ${mode === "global" || mode === "swmo" ? "up to 16" : "up to 12"} strong candidates so the backend can select the best five. There is no minimum result count; verification and relevance take priority.
 - Prefer unseen roles, but previously seen still-live roles may fill remaining slots.
 - Never include a closed, language-mismatched or clearly irrelevant vacancy just to reach five.
@@ -374,7 +375,7 @@ DIRECT_URL: https://...
 PUBLISHED_DATE: YYYY-MM-DD
 LANGUAGE_CHECK: English sufficient; Dutch/French not mandatory.
 REMOTE_CHECK: ${mode === "global" ? "Belgium/Europe/EMEA remote eligibility verified: ..." : "N/A"}
-MOBILITY_CHECK: ${mode === "swmo" ? "International/Belgium-based applicant can realistically be considered because: ..." : "N/A"}
+MOBILITY_CHECK: ${mode === "swmo" ? "Belgian/EU-citizen applicant can realistically be considered because: ..." : "N/A"}
 SCORE: 8.7
 WHY_FIT_1: ...
 WHY_FIT_2: ...
@@ -427,9 +428,23 @@ function hasVerifiedEuropeRemote(job) {
 
 function hasRealisticSwmoMobility(job) {
   const check = String(job?.mobilityCheck || "");
+  const location = String(job?.location || "");
   if (!check) return false;
-  if (/\b(ineligible|not eligible|local candidates only|no sponsorship|must already have|swiss nationals? only|monaco residents? only)\b/i.test(check)) return false;
-  return /\b(international|relocation|sponsor|sponsorship|work permit|permit|eu|eea|cross-border|eligible|considered|open to)\b/i.test(check);
+
+  const isSwiss = /\b(switzerland|swiss|zurich|geneva|gen[eè]ve|basel|zug|lausanne|bern)\b/i.test(location);
+  const isMonaco = /\b(monaco|monte carlo|monte-carlo)\b/i.test(location);
+
+  if (isSwiss) {
+    if (/\b(swiss nationals? only|swiss citizenship required|must already be swiss resident)\b/i.test(check)) return false;
+    return /\b(belgian|eu|european union|eea|efta|free movement|residence permit|registration|eligible|international|open to)\b/i.test(check);
+  }
+
+  if (isMonaco) {
+    if (/\b(monaco residents? only|monegasque nationals? only|local candidates only|must already reside in monaco|not eligible)\b/i.test(check)) return false;
+    return /\b(belgian|eu|international|eligible|considered|open to|work authori[sz]ation|permit|relocation)\b/i.test(check);
+  }
+
+  return false;
 }
 
 function finalizeJobsFromResponse(data, mode = "") {
