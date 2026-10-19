@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.4.0-efficient-search-ui";
+const APP_VERSION = "3.5.0-ms-generator";
 
 const MODES = {
   reasonable: {
@@ -402,6 +402,219 @@ function finalizeJobsFromResponse(data, mode = "") {
     .slice(0, 5);
 }
 
+
+const MS_PROFILE = `Use only these established candidate facts when relevant:
+- Name: Ulas Atilgan. Lives in Kapellen, Belgium. Belgian/EU citizen; no visa sponsorship required.
+- 12+ years across banking, fintech, internal audit, fraud investigation, internal control, IAM/access operations and IT risk/security; currently at ING Belgium.
+- Experience coordinating business, IT, risk and support stakeholders; transformation/project follow-up, operational ownership, reporting, controls and process improvement.
+- Earlier BPN/Western Union Turkey experience includes financial transaction/reconciliation and payment-process work.
+- BA Business Administration; BA International Relations; MSc Information Technologies with data/ML focus. Certifications include CISA, CIA, CIAM, CFE, CFSA and CMB3.
+- Curious, analytical and tech-savvy; builds AI-assisted workflows/apps using OpenAI APIs, GitHub and Railway and looks for practical automation opportunities.
+- Entrepreneurial hands-on ownership through Hondinn and other personal projects.
+- Fluent English working experience in international environments. Dutch is developing.
+- Investment/UlasTrade or entrepreneurship examples should be used only when genuinely relevant to the vacancy.`;
+
+function buildMsPrompt(job, note) {
+  const safeNote = String(note || "").trim().slice(0, 1200);
+  return `Create a concise MSVersion1-style motivation statement for this exact vacancy.
+
+VACANCY
+Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location || ""}
+URL: ${job.url}
+Published: ${job.publishedDate || ""}
+
+${MS_PROFILE}
+
+USER NOTE
+${safeNote || "No extra note."}
+
+RESEARCH
+Use web search to inspect the current vacancy page. If the exact page is unavailable, search the company + exact role and use the current official/ATS version. Identify the role's real priorities before writing.
+
+WRITING RULES
+- First person, natural English, direct and professional. Sound like Ulas, not like HR marketing copy.
+- One short intro, then exactly 7 numbered points.
+- Each point: a short specific heading + 1 compact paragraph, normally 2 short sentences.
+- Tailor every point to the actual vacancy. Connect evidence to what the employer needs.
+- Keep claims factual. Do not invent team size, revenue, achievements, tools, languages or responsibilities.
+- Include curiosity, analytical/tech-savvy mindset and practical ownership where relevant.
+- Include Belgian citizenship/no sponsorship naturally, preferably in point 7 unless another placement fits better.
+- Apply the USER NOTE when it is compatible with known facts. A note may ask to emphasize or omit a topic.
+- Avoid generic buzzwords, long sentences, exaggerated praise and repeated phrases.
+- Target a clean one-page PDF: intro <=55 words; each point paragraph <=45 words.
+- Do not add Dear, Sincerely, contact details or a closing paragraph.
+
+OUTPUT EXACTLY:
+INTRO: ...
+
+---POINT---
+NUMBER: 01
+TITLE: ...
+TEXT: ...
+
+Repeat ---POINT--- through NUMBER: 07. No markdown and no extra commentary.`;
+}
+
+function parseMsOutput(text) {
+  const raw = String(text || "").trim();
+  const introMatch = raw.match(/INTRO:\s*([\s\S]*?)(?=\n---POINT---)/i);
+  const intro = String(introMatch?.[1] || "").replace(/\s+/g, " ").trim();
+  const points = raw.split("---POINT---").slice(1).map(block => {
+    const number = (block.match(/NUMBER:\s*(\d{1,2})/i) || [])[1] || "";
+    const title = (block.match(/TITLE:\s*([^\n]+)/i) || [])[1] || "";
+    const textMatch = block.match(/TEXT:\s*([\s\S]*?)(?=$|\n---POINT---)/i);
+    return {
+      number: String(number).padStart(2,"0"),
+      title: String(title).replace(/\s+/g," ").trim(),
+      text: String(textMatch?.[1] || "").replace(/\s+/g," ").trim()
+    };
+  }).filter(p => p.title && p.text);
+
+  if (!intro || points.length !== 7) throw new Error("Could not create a valid seven-point motivation statement.");
+  return { intro, points: points.slice(0, 7) };
+}
+
+function pdfSafeText(value) {
+  return String(value || "")
+    .replace(/[\u2018\u2019]/g, "'")
+    .replace(/[\u201C\u201D]/g, '"')
+    .replace(/[\u2013\u2014]/g, "-")
+    .replace(/\u2026/g, "...")
+    .replace(/\u2022/g, "-")
+    .replace(/[^\x20-\x7E]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pdfEscape(value) {
+  return pdfSafeText(value).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function wrapPdfText(value, maxChars) {
+  const words = pdfSafeText(value).split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    const next = line ? line + " " + word : word;
+    if (next.length <= maxChars || !line) line = next;
+    else { lines.push(line); line = word; }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function buildMotivationPdf(job, ms) {
+  const W = 595.28, H = 841.89;
+  const commands = [];
+  const text = (value, x, y, size=9, bold=false, gray=0.12) => {
+    commands.push(`BT /F${bold ? 2 : 1} ${size.toFixed(1)} Tf ${gray} g 1 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)} Tm (${pdfEscape(value)}) Tj ET`);
+  };
+  const rule = (x1,y1,x2,y2,gray=0.88) => commands.push(`${gray} G 0.6 w ${x1} ${y1} m ${x2} ${y2} l S`);
+
+  let y = 794;
+  text("Ulas Atilgan", 48, y, 10.2, true, 0.10); y -= 16;
+  text(job.title || "Application", 48, y, 9.1, false, 0.28); y -= 13;
+  if (job.company) { text(job.company, 48, y, 9.1, false, 0.28); y -= 24; }
+  rule(48,y+9,547,y+9,0.90);
+  text("Motivation Statement", 48, y-7, 17.2, true, 0.08); y -= 32;
+
+  const introLines = wrapPdfText(ms.intro, 99).slice(0,5);
+  for (const line of introLines) { text(line,48,y,9.0,false,0.20); y -= 11.5; }
+  y -= 10;
+
+  const bodySize = 8.35, bodyLead = 10.0;
+  for (let i=0;i<7;i++) {
+    const p = ms.points[i];
+    const num = String(i+1).padStart(2,"0");
+    text(num,48,y,9.3,true,0.42);
+    text(p.title,78,y,9.3,true,0.12);
+    y -= 13;
+    const lines = wrapPdfText(p.text, 96).slice(0,5);
+    for (const line of lines) { text(line,78,y,bodySize,false,0.24); y -= bodyLead; }
+    y -= 7;
+  }
+
+  if (y < 35) throw new Error("Generated motivation statement is too long for the one-page format.");
+
+  const stream = commands.join("\n");
+  const objects = [
+    null,
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W.toFixed(2)} ${H.toFixed(2)}] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
+    `<< /Length ${Buffer.byteLength(stream,"latin1")} >>\nstream\n${stream}\nendstream`
+  ];
+
+  let pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
+  const offsets = [0];
+  for (let i=1;i<objects.length;i++) {
+    offsets[i] = Buffer.byteLength(pdf,"latin1");
+    pdf += `${i} 0 obj\n${objects[i]}\nendobj\n`;
+  }
+  const xref = Buffer.byteLength(pdf,"latin1");
+  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for (let i=1;i<objects.length;i++) pdf += String(offsets[i]).padStart(10,"0") + " 00000 n \n";
+  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  return Buffer.from(pdf,"latin1");
+}
+
+function safePdfFilename(job) {
+  const slug = [job.company, job.title].filter(Boolean).join("_")
+    .replace(/[^A-Za-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,90);
+  return `Ulas_Atilgan_${slug || "Motivation_Statement"}_MSVersion1.pdf`;
+}
+
+function sendPdf(res, pdf, filename) {
+  res.writeHead(200, {
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `attachment; filename="${filename.replace(/"/g,"")}"`,
+    "Cache-Control": "no-store",
+    "Content-Length": pdf.length
+  });
+  res.end(pdf);
+}
+
+async function generateMotivationStatement(req, res) {
+  if (!OPENAI_API_KEY) return sendJson(res, 503, { error: "OPENAI_API_KEY is not configured in Railway." });
+  const body = await readJson(req);
+  const rawJob = body?.job || {};
+  const job = {
+    title: String(rawJob.title || "").trim().slice(0,180),
+    company: String(rawJob.company || "").trim().slice(0,140),
+    location: String(rawJob.location || "").trim().slice(0,140),
+    url: normalizeUrl(rawJob.url),
+    publishedDate: String(rawJob.publishedDate || "").trim().slice(0,20)
+  };
+  const note = String(body?.note || "").trim().slice(0,1200);
+  if (!job.title || !job.company || !/^https?:\/\//i.test(job.url)) {
+    return sendJson(res, 400, { error: "A valid watched vacancy is required." });
+  }
+
+  try {
+    const data = await openAIRequest("https://api.openai.com/v1/responses", {
+      method: "POST",
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        store: false,
+        tools: [{ type: "web_search", search_context_size: "low" }],
+        tool_choice: "required",
+        input: buildMsPrompt(job, note),
+        max_output_tokens: 1800
+      })
+    });
+    const ms = parseMsOutput(extractOutputText(data));
+    const pdf = buildMotivationPdf(job, ms);
+    return sendPdf(res, pdf, safePdfFilename(job));
+  } catch (error) {
+    console.error("U-Job MS generation error:", error);
+    return sendJson(res, 502, { error: error?.message || "Could not generate motivation statement." });
+  }
+}
+
 async function openAIRequest(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -590,6 +803,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/search/start") {
       return await startSearch(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/ms/generate") {
+      return await generateMotivationStatement(req, res);
     }
 
     if (req.method === "GET" && url.pathname === "/api/search/status") {
