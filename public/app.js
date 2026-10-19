@@ -1,8 +1,8 @@
 const MODES={reasonable:{title:"Reasonable",hint:"Fintech, business operations and Chief of Staff-style roles."},creative:{title:"Creative",hint:"Niche, hands-on, dream-job territory."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Institutions, policy, finance, security and international influence."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
-const STORAGE_KEY="ujob:data";let state=loadState();let activeMode=state.activeMode||"reasonable";let activeView=state.activeView||activeMode;const modeStatus={reasonable:"",creative:"",corporate:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={reasonable:null,creative:null,corporate:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
+const STORAGE_KEY="ujob:data";let state=loadState();let activeMode=state.activeMode||"reasonable";let activeView=state.activeView||activeMode;const msBusy=new Set();const modeStatus={reasonable:"",creative:"",corporate:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={reasonable:null,creative:null,corporate:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
 const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount")};
 function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}
-function emptyState(){return{activeMode:"reasonable",activeView:"reasonable",actions:{},reasonable:blankMode(),creative:blankMode(),corporate:blankMode(),ai:blankMode(),linkedin:blankMode(),global:blankMode(),swmo:blankMode(),prestige:blankMode(),highpaid:blankMode(),turkish:blankMode()}}
+function emptyState(){return{activeMode:"reasonable",activeView:"reasonable",actions:{},msNotes:{},reasonable:blankMode(),creative:blankMode(),corporate:blankMode(),ai:blankMode(),linkedin:blankMode(),global:blankMode(),swmo:blankMode(),prestige:blankMode(),highpaid:blankMode(),turkish:blankMode()}}
 function mergeRuns(a,b){const seen=new Set();return[...(a||[]),...(b||[])].filter(r=>r&&r.at&&Array.isArray(r.jobs)).sort((x,y)=>new Date(y.at)-new Date(x.at)).filter(r=>{const k=r.at+"|"+r.jobs.map(j=>j.url||j.title||"").join("|");if(seen.has(k))return false;seen.add(k);return true}).slice(0,250)}
 function mergeModeData(a,b){
   a=a||blankMode();b=b||blankMode();
@@ -16,6 +16,7 @@ function mergeState(base,raw){
   if(raw.activeMode==="politics")out.activeMode="prestige";else if(raw.activeMode&&MODES[raw.activeMode])out.activeMode=raw.activeMode;
   if(raw.activeView==="politics")out.activeView="prestige";else if(raw.activeView&&(MODES[raw.activeView]||raw.activeView==="actions"))out.activeView=raw.activeView;
   out.actions={...(base.actions||{}),...(raw.actions||{})};
+  out.msNotes={...(base.msNotes||{}),...(raw.msNotes||{})};
   for(const mode of Object.keys(MODES))out[mode]=mergeModeData(out[mode],raw[mode]);
   if(raw.politics)out.prestige=mergeModeData(out.prestige,raw.politics);
   return out;
@@ -139,17 +140,93 @@ function renderResults(jobs,mode){
   </article>`).join("");
   bindAppliedControls(els.results);
 }
+function msFilename(job){
+  const slug=[job.company,job.title].filter(Boolean).join("_").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,90);
+  return "Ulas_Atilgan_"+(slug||"Motivation_Statement")+"_MSVersion1.pdf";
+}
+async function generateMs(key,button){
+  const job=state.actions?.[key];
+  if(!job||msBusy.has(key))return;
+  const card=button.closest(".action-job");
+  const noteEl=card?.querySelector("textarea[data-ms-note-key]");
+  const statusEl=card?.querySelector("[data-ms-status]");
+  const note=noteEl?.value||state.msNotes?.[key]||"";
+  if(!state.msNotes)state.msNotes={};
+  state.msNotes[key]=note;
+  saveState();
+
+  msBusy.add(key);
+  button.disabled=true;
+  button.textContent="Generating PDF…";
+  if(statusEl)statusEl.textContent="Reading the vacancy and tailoring 7 points…";
+
+  let preview=null;
+  try{preview=window.open("","_blank");}catch{}
+  try{
+    const response=await apiFetch("/api/ms/generate",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({job,note})
+    },90000);
+
+    if(!response.ok){
+      const data=await response.json().catch(()=>({}));
+      throw new Error(data.error||"Could not generate motivation statement.");
+    }
+    const blob=await response.blob();
+    if(blob.type!=="application/pdf")throw new Error("The server did not return a PDF.");
+    const blobUrl=URL.createObjectURL(blob);
+    if(preview){
+      preview.location.href=blobUrl;
+    }else{
+      const a=document.createElement("a");
+      a.href=blobUrl;a.download=msFilename(job);document.body.appendChild(a);a.click();a.remove();
+    }
+    if(statusEl)statusEl.textContent="PDF ready.";
+    setTimeout(()=>URL.revokeObjectURL(blobUrl),120000);
+  }catch(error){
+    try{preview?.close()}catch{}
+    if(statusEl)statusEl.textContent=error?.name==="AbortError"?"Generation took too long. Try again.":(error.message||"Could not generate PDF.");
+  }finally{
+    msBusy.delete(key);
+    button.disabled=false;
+    button.textContent="Generate MS";
+  }
+}
+function bindMsControls(root){
+  root.querySelectorAll("textarea[data-ms-note-key]").forEach(area=>{
+    area.addEventListener("input",()=>{
+      if(!state.msNotes)state.msNotes={};
+      state.msNotes[area.dataset.msNoteKey]=area.value.slice(0,1200);
+      saveState();
+    });
+  });
+  root.querySelectorAll("button[data-generate-ms]").forEach(button=>{
+    button.addEventListener("click",()=>generateMs(button.dataset.generateMs,button));
+  });
+}
 function renderActionResults(jobs){
   if(!jobs.length){
     els.results.innerHTML='<div class="empty">Tick Watch on any vacancy to keep it here.</div>';
     return;
   }
-  els.results.innerHTML=jobs.map(job=>`<article class="job action-job action-compact">
-    <h2 class="job-title"><a class="action-title-link" href="${esc(job.url)}" target="_blank" rel="noopener noreferrer">${esc(job.title)}</a></h2>
-    <div class="job-meta">${esc(job.company)} · ${esc(job.location)}${job.publishedDate?` · Published ${esc(job.publishedDate)}`:""}</div>
-    ${appliedControl(job,job.sourceMode||"",false)}
-  </article>`).join("");
+  els.results.innerHTML=jobs.map(job=>{
+    const key=actionKey(job);
+    const note=state.msNotes?.[key]||"";
+    const busy=msBusy.has(key);
+    return `<article class="job action-job action-compact">
+      <h2 class="job-title"><a class="action-title-link" href="${esc(job.url)}" target="_blank" rel="noopener noreferrer">${esc(job.title)}</a></h2>
+      <div class="job-meta">${esc(job.company)} · ${esc(job.location)}${job.publishedDate?` · Published ${esc(job.publishedDate)}`:""}</div>
+      <div class="ms-tools">
+        <button class="generate-ms" type="button" data-generate-ms="${esc(key)}"${busy?" disabled":""}>${busy?"Generating PDF…":"Generate MS"}</button>
+        <textarea class="ms-note" data-ms-note-key="${esc(key)}" maxlength="1200" rows="2" placeholder="MS note — e.g. emphasize AI, mention investments, do not mention Hondinn…">${esc(note)}</textarea>
+        <div class="ms-status" data-ms-status aria-live="polite"></div>
+      </div>
+      ${appliedControl(job,job.sourceMode||"",false)}
+    </article>`;
+  }).join("");
   bindAppliedControls(els.results);
+  bindMsControls(els.results);
 }
 function renderHistory(runs,mode){
   if(!runs.length){
@@ -332,5 +409,5 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=36",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=37",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));els.actionsButton?.addEventListener("click",showActions);els.run.addEventListener("click",runSearch);els.historyToggle.addEventListener("click",()=>{const opening=els.history.hidden;els.history.hidden=!opening;els.historyToggle.setAttribute("aria-expanded",String(opening))});document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")resumePendingSearches()});window.addEventListener("focus",resumePendingSearches);renderToday();setInterval(renderToday,60000);if(activeView==="actions")showActions();else setMode(activeMode);checkHealth();resumePendingSearches();
