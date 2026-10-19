@@ -3,21 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#6b4630">
+  <meta name="theme-color" content="#f3f4f6">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="U-Job">
   <title>U-Job</title>
-  <link rel="manifest" href="/manifest.webmanifest?v=35">
-  <link rel="icon" href="/icon.svg?v=35" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/icon.svg?v=35">
-  <link rel="stylesheet" href="/styles.css?v=35">
+  <link rel="manifest" href="/manifest.webmanifest?v=36">
+  <link rel="icon" href="/icon.svg?v=36" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg?v=36">
+  <link rel="stylesheet" href="/styles.css?v=36">
 </head>
 <body data-mode="reasonable">
   <main class="shell">
     <header class="topbar">
       <div class="brand-center">
-        <div class="brand-mark">U<span>·</span>JOB</div>
+        <div class="brand-mark" aria-label="U Job">
+          <span class="brand-glyph">U<span class="brand-signal"></span></span>
+          <span class="brand-word">JOB</span>
+        </div>
         <div id="todayDate" class="today-date"></div>
       </div>
       <div id="lastUpdate" class="last-update"></div>
@@ -61,6 +64,6 @@
       caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key)))).catch(() => {});
     }
   </script>
-  <script type="module" src="/app.js?v=35"></script>
+  <script type="module" src="/app.js?v=36"></script>
 </body>
 </html>
