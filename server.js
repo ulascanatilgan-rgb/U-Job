@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.5.0-ms-generator";
+const APP_VERSION = "3.6.0-ask-link-analyzer";
 
 const MODES = {
   reasonable: {
@@ -615,6 +615,97 @@ async function generateMotivationStatement(req, res) {
   }
 }
 
+
+function buildAskPrompt(url) {
+  return `Analyze this exact job-vacancy URL for Ulas Atilgan:
+${url}
+
+${CANDIDATE}
+
+TASK
+- Inspect the exact link with live web search. If needed, cross-check company + exact vacancy on its official/ATS page.
+- Identify the real role, employer, location and current status. Do not invent missing facts.
+- Score personal fit from 0.0 to 10.0. Judge realistic candidacy, transferable experience, seniority, language/location eligibility, work style, compensation/career upside and likely enjoyment.
+- Be demanding: a famous company is not enough. Penalize major must-have gaps.
+- Explain fit in exactly 3 short, concrete reasons, written for the candidate.
+- If the vacancy is closed but identifiable, still analyze it and mark STATUS: CLOSED. If the role cannot be identified reliably, output STATUS: UNKNOWN.
+- Keep the supplied URL as DIRECT_URL.
+- English suitability should be factual. Belgian/EU citizenship means no Belgian sponsorship issue and is a mobility advantage in Europe.
+
+OUTPUT EXACTLY:
+STATUS: OPEN
+TITLE: ...
+COMPANY: ...
+LOCATION: ...
+PUBLISHED_DATE: YYYY-MM-DD or N/A
+LANGUAGE_CHECK: ...
+SCORE: 8.4
+WHY_FIT_1: ...
+WHY_FIT_2: ...
+WHY_FIT_3: ...
+DIRECT_URL: ${url}
+
+No markdown and no extra commentary.`;
+}
+
+function parseAskOutput(text, originalUrl) {
+  const fields = {};
+  for (const raw of String(text || "").split("\n")) {
+    const line = raw.trim();
+    const i = line.indexOf(":");
+    if (i <= 0) continue;
+    fields[line.slice(0,i).trim().toUpperCase()] = line.slice(i+1).trim();
+  }
+
+  const status = String(fields.STATUS || "UNKNOWN").toUpperCase();
+  const score = Math.round(Math.max(0, Math.min(10, Number(fields.SCORE) || 0)) * 10) / 10;
+  const whyFit = [fields.WHY_FIT_1,fields.WHY_FIT_2,fields.WHY_FIT_3]
+    .map(v=>String(v||"").replace(/\s+/g," ").trim()).filter(Boolean);
+
+  if (!fields.TITLE || !fields.COMPANY || whyFit.length < 2 || !Number.isFinite(score)) {
+    throw new Error("Could not identify and evaluate this vacancy reliably.");
+  }
+
+  return {
+    status,
+    title:String(fields.TITLE).trim(),
+    company:String(fields.COMPANY).trim(),
+    location:String(fields.LOCATION||"").trim(),
+    publishedDate:/^\d{4}-\d{2}-\d{2}$/.test(String(fields.PUBLISHED_DATE||"").trim()) ? String(fields.PUBLISHED_DATE).trim() : "",
+    languageCheck:String(fields.LANGUAGE_CHECK||"").trim(),
+    score,
+    whyFit:whyFit.slice(0,3),
+    url:normalizeUrl(originalUrl)
+  };
+}
+
+async function analyzeAskLink(req, res) {
+  if (!OPENAI_API_KEY) return sendJson(res, 503, { error: "OPENAI_API_KEY is not configured in Railway." });
+
+  const body = await readJson(req);
+  const url = normalizeUrl(body?.url);
+  if (!/^https?:\/\//i.test(url)) return sendJson(res, 400, { error: "Enter a valid job vacancy URL." });
+
+  try {
+    const data = await openAIRequest("https://api.openai.com/v1/responses", {
+      method: "POST",
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        store: false,
+        tools: [{ type: "web_search", search_context_size: "low" }],
+        tool_choice: "required",
+        input: buildAskPrompt(url),
+        max_output_tokens: 1200
+      })
+    });
+    const job = parseAskOutput(extractOutputText(data), url);
+    return sendJson(res, 200, { job, analyzedAt: new Date().toISOString(), appVersion: APP_VERSION });
+  } catch (error) {
+    console.error("U-Job Ask analysis error:", error);
+    return sendJson(res, 502, { error: error?.message || "Could not analyze this vacancy." });
+  }
+}
+
 async function openAIRequest(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -803,6 +894,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/search/start") {
       return await startSearch(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/ask/analyze") {
+      return await analyzeAskLink(req, res);
     }
 
     if (req.method === "POST" && url.pathname === "/api/ms/generate") {
