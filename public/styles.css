@@ -83,7 +83,7 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
 .mode.turkish{--mode-accent:#d33b40;--mode-soft:#fce9eb}
 
 .actions-mode{
-  width:calc((100% - 14px)/3);margin-top:9px;min-height:43px;padding:0 11px;
+  width:min(180px,48%);margin-top:0;min-height:43px;padding:0 11px;
   border:1px solid rgba(58,126,96,.16);border-radius:13px;
   background:rgba(240,247,243,.76);color:#326c51;
   display:flex;align-items:center;justify-content:space-between;
@@ -161,7 +161,7 @@ h1{margin:0 0 7px;font-size:29px;line-height:1;font-weight:680;letter-spacing:-.
 @media(min-width:700px){
   .shell{padding-left:28px;padding-right:28px}
   .modes{grid-template-columns:repeat(5,minmax(0,1fr))}
-  .actions-mode{width:calc((100% - 28px)/5)}
+  .actions-mode{width:min(180px,48%)}
   .job{padding:20px 72px 47px 20px}
   .job-title{font-size:15px}
 }
@@ -257,4 +257,35 @@ h1{margin:0 0 7px;font-size:29px;line-height:1;font-weight:680;letter-spacing:-.
 @media(max-width:520px){
   .ask-panel{left:14px;right:14px;width:auto;bottom:max(86px,calc(env(safe-area-inset-bottom) + 86px));padding:16px;border-radius:21px}
   .ask-fab{right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));width:56px;height:56px}
+}
+
+
+/* Watchlist + Ask utility row */
+.utility-row{
+  margin-top:9px;display:flex;align-items:center;justify-content:space-between;gap:12px
+}
+.ask-inline{
+  flex:0 0 44px;width:44px;height:44px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.28);
+  background:linear-gradient(145deg,#7d2348,#5d1737);color:#fff;
+  font-size:10.5px;font-weight:720;letter-spacing:.01em;cursor:pointer;
+  box-shadow:0 8px 20px rgba(91,24,55,.18),inset 0 1px 0 rgba(255,255,255,.2);
+  transition:transform .14s ease,box-shadow .14s ease
+}
+.ask-inline:active{transform:scale(.97)}
+.ask-inline[aria-expanded="true"]{
+  box-shadow:0 8px 24px rgba(91,24,55,.25),0 0 0 3px rgba(125,35,72,.08)
+}
+
+/* Ask is now anchored to the Watchlist row, not the viewport corner */
+.ask-panel{
+  right:max(18px,env(safe-area-inset-right));
+  bottom:auto;
+  top:190px
+}
+@media(max-width:520px){
+  .utility-row{gap:10px}
+  .actions-mode{width:min(170px,72%)}
+  .ask-inline{width:43px;height:43px;flex-basis:43px}
+  .ask-panel{left:14px;right:14px;top:210px;bottom:auto;width:auto;max-height:calc(100vh - 230px)}
 }
