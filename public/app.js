@@ -1,14 +1,22 @@
 const MODES={reasonable:{title:"Reasonable",hint:"Fintech, business operations and Chief of Staff-style roles."},creative:{title:"Creative",hint:"Niche, hands-on, dream-job territory."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Institutions, policy, finance, security and international influence."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
-const STORAGE_KEY="ujob:data";let state=loadState();let activeMode=state.activeMode||"reasonable";let activeView=state.activeView||activeMode;const msBusy=new Set();const modeStatus={reasonable:"",creative:"",corporate:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={reasonable:null,creative:null,corporate:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
-const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount")};
+const STORAGE_KEY="ujob:data";let state=loadState();let activeMode=state.activeMode||"reasonable";let activeView=state.activeView||activeMode;const msBusy=new Set();let askBusy=false;const modeStatus={reasonable:"",creative:"",corporate:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={reasonable:null,creative:null,corporate:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
+const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory")};
 function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}
-function emptyState(){return{activeMode:"reasonable",activeView:"reasonable",actions:{},msNotes:{},reasonable:blankMode(),creative:blankMode(),corporate:blankMode(),ai:blankMode(),linkedin:blankMode(),global:blankMode(),swmo:blankMode(),prestige:blankMode(),highpaid:blankMode(),turkish:blankMode()}}
+function emptyState(){return{activeMode:"reasonable",activeView:"reasonable",actions:{},msNotes:{},askHistory:[],reasonable:blankMode(),creative:blankMode(),corporate:blankMode(),ai:blankMode(),linkedin:blankMode(),global:blankMode(),swmo:blankMode(),prestige:blankMode(),highpaid:blankMode(),turkish:blankMode()}}
 function mergeRuns(a,b){const seen=new Set();return[...(a||[]),...(b||[])].filter(r=>r&&r.at&&Array.isArray(r.jobs)).sort((x,y)=>new Date(y.at)-new Date(x.at)).filter(r=>{const k=r.at+"|"+r.jobs.map(j=>j.url||j.title||"").join("|");if(seen.has(k))return false;seen.add(k);return true}).slice(0,250)}
 function mergeModeData(a,b){
   a=a||blankMode();b=b||blankMode();
   const at=a.lastUpdate?new Date(a.lastUpdate).getTime():0;
   const bt=b.lastUpdate?new Date(b.lastUpdate).getTime():0;
   return{lastUpdate:bt>at?b.lastUpdate:a.lastUpdate,latest:bt>at?(Array.isArray(b.latest)?b.latest:[]):(Array.isArray(a.latest)?a.latest:[]),runs:mergeRuns(a.runs,b.runs),pendingSearch:b.pendingSearch||a.pendingSearch||null};
+}
+function mergeAskHistory(a,b){
+  const seen=new Set();
+  return [...(a||[]),...(b||[])].filter(item=>item&&item.job&&item.job.url).sort((x,y)=>new Date(y.analyzedAt||0)-new Date(x.analyzedAt||0)).filter(item=>{
+    const k=(item.analyzedAt||"")+"|"+item.job.url;
+    if(seen.has(k))return false;
+    seen.add(k);return true;
+  }).slice(0,100);
 }
 function mergeState(base,raw){
   if(!raw||typeof raw!=="object")return base;
@@ -17,6 +25,7 @@ function mergeState(base,raw){
   if(raw.activeView==="politics")out.activeView="prestige";else if(raw.activeView&&(MODES[raw.activeView]||raw.activeView==="actions"))out.activeView=raw.activeView;
   out.actions={...(base.actions||{}),...(raw.actions||{})};
   out.msNotes={...(base.msNotes||{}),...(raw.msNotes||{})};
+  out.askHistory=mergeAskHistory(base.askHistory,raw.askHistory);
   for(const mode of Object.keys(MODES))out[mode]=mergeModeData(out[mode],raw[mode]);
   if(raw.politics)out.prestige=mergeModeData(out.prestige,raw.politics);
   return out;
@@ -204,6 +213,59 @@ function bindMsControls(root){
   root.querySelectorAll("button[data-generate-ms]").forEach(button=>{
     button.addEventListener("click",()=>generateMs(button.dataset.generateMs,button));
   });
+}
+function addAskToWatchlist(job){
+  const key=actionKey(job);if(!key)return;
+  if(!state.actions)state.actions={};
+  const existing=state.actions[key];
+  state.actions[key]={...job,sourceMode:"ask",appliedAt:existing?.appliedAt||new Date().toISOString()};
+  saveState();renderAsk();if(activeView==="actions")render();
+}
+function askResultCard(item,history=false){
+  const job=item&&item.job;if(!job)return"";
+  const key=actionKey(job),watched=Boolean(state.actions?.[key]),status=String(job.status||"").toUpperCase();
+  const reasons=(job.whyFit||[]).map(v=>"<p>"+esc(v)+"</p>").join("");
+  const statusHtml=status?"<span class=\"ask-status "+(status==="OPEN"?"open":"closed")+"\">"+esc(status)+"</span>":"";
+  const dateHtml=job.publishedDate?"<span>"+esc(job.publishedDate)+"</span>":"";
+  const locHtml=job.location?" · "+esc(job.location):"";
+  const langHtml=job.languageCheck?"<div class=\"ask-language\">"+esc(job.languageCheck)+"</div>":"";
+  return "<article class=\"ask-result-card"+(history?" ask-history-card":"")+"\">"+
+    "<div class=\"ask-score\">"+esc(Number(job.score||0).toFixed(1))+"</div>"+
+    "<div class=\"ask-result-main\"><div class=\"ask-result-topline\">"+statusHtml+dateHtml+"</div>"+
+    "<h3>"+esc(job.title)+"</h3><div class=\"ask-meta\">"+esc(job.company)+locHtml+"</div>"+
+    "<div class=\"ask-reasons\">"+reasons+"</div>"+langHtml+
+    "<div class=\"ask-actions\"><a href=\""+esc(job.url)+"\" target=\"_blank\" rel=\"noopener noreferrer\">Open job ↗</a>"+
+    "<button type=\"button\" data-ask-watch=\""+esc(key)+"\" "+(watched?"disabled":"")+">"+(watched?"In Watchlist":"Add to Watchlist")+"</button></div></div></article>";
+}
+function renderAsk(){
+  if(!els.askResult||!els.askHistory)return;
+  const items=Array.isArray(state.askHistory)?state.askHistory:[];
+  els.askResult.innerHTML=items.length?askResultCard(items[0],false):"<div class=\"ask-empty\">Paste a vacancy link to score it against your profile.</div>";
+  els.askHistory.innerHTML=items.slice(1).map(item=>askResultCard(item,true)).join("")||"<div class=\"ask-empty small\">No previous Ask analyses yet.</div>";
+  document.querySelectorAll("[data-ask-watch]").forEach(btn=>btn.addEventListener("click",()=>{
+    const item=(state.askHistory||[]).find(x=>actionKey(x.job)===btn.dataset.askWatch);
+    if(item?.job)addAskToWatchlist(item.job);
+  }));
+}
+function setAskOpen(open){
+  if(!els.askPanel)return;els.askPanel.hidden=!open;els.askButton?.setAttribute("aria-expanded",String(open));
+  if(open){renderAsk();setTimeout(()=>els.askUrl?.focus(),50)}
+}
+async function analyzeAsk(){
+  if(askBusy)return;
+  const url=String(els.askUrl?.value||"").trim();
+  if(!/^https?:\/\//i.test(url)){els.askResult.innerHTML="<div class=\"ask-error\">Enter a valid job vacancy link.</div>";return}
+  askBusy=true;els.askRun.disabled=true;els.askRun.textContent="Analyzing…";
+  els.askResult.innerHTML="<div class=\"ask-loading\">Reading the vacancy and scoring your fit…</div>";
+  try{
+    const response=await apiFetch("/api/ask/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url})},60000);
+    const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Could not analyze this vacancy.");
+    const item={job:data.job,analyzedAt:data.analyzedAt||new Date().toISOString()};
+    state.askHistory=mergeAskHistory([item],state.askHistory||[]);saveState();renderAsk();
+  }catch(error){
+    const msg=error?.name==="AbortError"?"Analysis took too long. Try again.":(error.message||"Could not analyze this vacancy.");
+    els.askResult.innerHTML="<div class=\"ask-error\">"+esc(msg)+"</div>";
+  }finally{askBusy=false;els.askRun.disabled=false;els.askRun.textContent="Analyze"}
 }
 function renderActionResults(jobs){
   if(!jobs.length){
@@ -409,5 +471,16 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=37",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
-document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));els.actionsButton?.addEventListener("click",showActions);els.run.addEventListener("click",runSearch);els.historyToggle.addEventListener("click",()=>{const opening=els.history.hidden;els.history.hidden=!opening;els.historyToggle.setAttribute("aria-expanded",String(opening))});document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")resumePendingSearches()});window.addEventListener("focus",resumePendingSearches);renderToday();setInterval(renderToday,60000);if(activeView==="actions")showActions();else setMode(activeMode);checkHealth();resumePendingSearches();
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=38",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
+els.actionsButton?.addEventListener("click",showActions);
+els.run.addEventListener("click",runSearch);
+els.historyToggle.addEventListener("click",()=>{const opening=els.history.hidden;els.history.hidden=!opening;els.historyToggle.setAttribute("aria-expanded",String(opening))});
+els.askButton?.addEventListener("click",()=>setAskOpen(Boolean(els.askPanel?.hidden)));
+els.askClose?.addEventListener("click",()=>setAskOpen(false));
+els.askRun?.addEventListener("click",analyzeAsk);
+els.askUrl?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();analyzeAsk()}});
+document.addEventListener("keydown",event=>{if(event.key==="Escape"&&!els.askPanel?.hidden)setAskOpen(false)});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")resumePendingSearches()});
+window.addEventListener("focus",resumePendingSearches);
+renderToday();setInterval(renderToday,60000);if(activeView==="actions")showActions();else setMode(activeMode);renderAsk();checkHealth();resumePendingSearches();
