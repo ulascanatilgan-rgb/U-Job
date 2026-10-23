@@ -15,7 +15,7 @@ body{
   transition:background .22s ease
 }
 body[data-mode="creative"]{--accent:#a66a00;--accent-soft:#fff2d7;--accent-ink:#744900}
-body[data-mode="corporate"]{--accent:#535966;--accent-soft:#eceef1;--accent-ink:#30343b}
+body[data-mode="corporate"]{--accent:#535966;--accent-soft:#eceef1;--accent-ink:#30343b}body[data-mode="fintech"]{--accent:#b4232f;--accent-soft:#f7e7e9;--accent-ink:#17191d}
 body[data-mode="ai"]{--accent:#7158d9;--accent-soft:#eeeafd;--accent-ink:#4a37a4}
 body[data-mode="linkedin"]{--accent:#0a66c2;--accent-soft:#e8f2fc;--accent-ink:#064d94}
 body[data-mode="global"]{--accent:#168a86;--accent-soft:#e5f5f3;--accent-ink:#0c625f}
@@ -49,7 +49,7 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
 .last-update{position:absolute;right:1px;top:13px;font-size:9.5px;color:#858991}
 
 .modes{
-  margin-top:6px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;padding:7px;
+  margin-top:6px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;padding:7px;
   background:rgba(250,251,252,.64);border:1px solid rgba(20,21,25,.07);border-radius:20px;
   backdrop-filter:blur(22px) saturate(125%);-webkit-backdrop-filter:blur(22px) saturate(125%);
   box-shadow:0 16px 44px rgba(24,30,40,.055),inset 0 1px 0 rgba(255,255,255,.78)
@@ -73,7 +73,7 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
 }
 .mode.reasonable{--mode-accent:#3867d6;--mode-soft:#e8efff}
 .mode.creative{--mode-accent:#a66a00;--mode-soft:#fff1d2}
-.mode.corporate{--mode-accent:#515761;--mode-soft:#eceef1}
+.mode.corporate{--mode-accent:#515761;--mode-soft:#eceef1}.mode.fintech{--mode-accent:#b4232f;--mode-soft:#eee7e9}
 .mode.ai{--mode-accent:#7158d9;--mode-soft:#eeeafd}
 .mode.linkedin{--mode-accent:#0a66c2;--mode-soft:#e5f1fc}
 .mode.global{--mode-accent:#168a86;--mode-soft:#e3f4f2}
@@ -160,7 +160,7 @@ h1{margin:0 0 7px;font-size:29px;line-height:1;font-weight:680;letter-spacing:-.
 
 @media(min-width:700px){
   .shell{padding-left:28px;padding-right:28px}
-  .modes{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .modes{grid-template-columns:repeat(6,minmax(0,1fr))}
   .actions-mode{width:min(180px,48%)}
   .job{padding:20px 72px 47px 20px}
   .job-title{font-size:15px}
