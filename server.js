@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.8.0-fintech-mode";
+const APP_VERSION = "3.8.1-clean-ask-ms";
 
 const MODES = {
   reasonable: {
@@ -413,48 +413,78 @@ function finalizeJobsFromResponse(data, mode = "") {
 }
 
 
-const MS_PROFILE = `Use only these established candidate facts when relevant:
-- Name: Ulas Atilgan. Lives in Kapellen, Belgium. Belgian/EU citizen; no visa sponsorship required.
-- 12+ years across banking, fintech, internal audit, fraud investigation, internal control, IAM/access operations and IT risk/security; currently at ING Belgium.
-- Experience coordinating business, IT, risk and support stakeholders; transformation/project follow-up, operational ownership, reporting, controls and process improvement.
-- Earlier BPN/Western Union Turkey experience includes financial transaction/reconciliation and payment-process work.
-- BA Business Administration; BA International Relations; MSc Information Technologies with data/ML focus. Certifications include CISA, CIA, CIAM, CFE, CFSA and CMB3.
-- Curious, analytical and tech-savvy; builds AI-assisted workflows/apps using OpenAI APIs, GitHub and Railway and looks for practical automation opportunities.
-- Entrepreneurial hands-on ownership through Hondinn and other personal projects.
-- Fluent English working experience in international environments. Dutch is developing.
-- Investment/UlasTrade or entrepreneurship examples should be used only when genuinely relevant to the vacancy.`;
+function cleanGeneratedText(value) {
+  return String(value || "")
+    .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/gi, "$1")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/www\.\S+/gi, "")
+    .replace(/cite[^]+/g, "")
+    .replace(/【[^】]+】/g, "")
+    .replace(/\(\s*source\s*:\s*[^)]+\)/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .trim();
+}
+
+function cleanGeneratedLabel(value) {
+  return cleanGeneratedText(value)
+    .replace(/\s*[|·•-]\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const MS_PROFILE = `Use only these established candidate facts:
+- Ulas Atilgan lives in Kapellen, Belgium; Belgian/EU citizen; no visa sponsorship required.
+- 12+ years across ING Belgium, banking, fintech-related work, internal audit, fraud investigation, internal control, IAM/access operations and IT risk/security.
+- Strong operational capability: coordinates business, IT, risk and support stakeholders; follows projects/transformation, owns operational processes, reporting, controls, issue follow-up and process improvement.
+- Good with numbers and analytical work: comfortable with reconciliations, financial/payment processes, dashboards, data interpretation, controls and structured decision-making.
+- Tech-savvy and curious: MSc Information Technologies with data/ML focus; builds AI-assisted workflows/apps with OpenAI APIs, GitHub and Railway; actively looks for automation opportunities.
+- Works already in an international banking environment in English and is comfortable with senior/cross-functional stakeholders.
+- Entrepreneurial and hands-on: built/operates Hondinn, a boutique dog-hotel business, involving customer experience, planning, operations, pricing and ownership.
+- BA Business Administration; BA International Relations; MSc Information Technologies. Certifications include CISA, CIA, CIAM, CFE, CFSA and CMB3.
+- Earlier BPN/Western Union Turkey experience includes transaction/reconciliation and payment-process exposure.
+- Investment/UlasTrade examples may be used when they strengthen the specific role fit.`;
 
 function buildMsPrompt(job, note) {
   const safeNote = String(note || "").trim().slice(0, 1200);
-  return `Create a concise MSVersion1-style motivation statement for this exact vacancy.
+  return `Write a concise one-page MSVersion1 motivation statement for this exact vacancy.
 
-VACANCY
-Title: ${job.title}
+VACANCY TO RESEARCH
+Role: ${job.title}
 Company: ${job.company}
 Location: ${job.location || ""}
-URL: ${job.url}
-Published: ${job.publishedDate || ""}
+Research URL: ${job.url}
 
 ${MS_PROFILE}
 
 USER NOTE
 ${safeNote || "No extra note."}
 
-RESEARCH
-Use web search to inspect the current vacancy page. If the exact page is unavailable, search the company + exact role and use the current official/ATS version. Identify the role's real priorities before writing.
+RESEARCH FIRST
+Read the current vacancy and identify its actual responsibilities, must-haves and working style. Use the URL only for research. NEVER print, mention, cite or reproduce the URL, website, source link or citation in the motivation statement.
 
-WRITING RULES
-- First person, natural English, direct and professional. Sound like Ulas, not like HR marketing copy.
-- One short intro, then exactly 7 numbered points.
-- Each point: a short specific heading + 1 compact paragraph, normally 2 short sentences.
-- Tailor every point to the actual vacancy. Connect evidence to what the employer needs.
-- Keep claims factual. Do not invent team size, revenue, achievements, tools, languages or responsibilities.
-- Include curiosity, analytical/tech-savvy mindset and practical ownership where relevant.
-- Include Belgian citizenship/no sponsorship naturally, preferably in point 7 unless another placement fits better.
-- Apply the USER NOTE when it is compatible with known facts. A note may ask to emphasize or omit a topic.
-- Avoid generic buzzwords, long sentences, exaggerated praise and repeated phrases.
-- Target a clean one-page PDF: intro <=55 words; each point paragraph <=45 words.
-- Do not add Dear, Sincerely, contact details or a closing paragraph.
+WRITING METHOD
+Create one short intro + exactly 7 points. Every point must connect ONE concrete employer need from the vacancy to ONE concrete candidate fact. Do not write generic personality claims without evidence.
+
+Across the 7 points, cover these themes when compatible with the vacancy:
+1. Direct match to the role's core operational/business responsibility.
+2. Operational ownership, coordination and stakeholder management.
+3. Numbers, analytics, reporting, reconciliation, controls or data-driven judgement.
+4. Tech-savvy/AI/automation mindset and MSc IT/ML.
+5. Existing international English-speaking banking environment and cross-functional communication.
+6. Hondinn/entrepreneurial hands-on ownership, customer focus and practical execution.
+7. Belgian/EU citizenship, Belgium base and no visa sponsorship requirement.
+
+Use banking/fintech, fraud/control, IAM/security, payment-process, certifications, International Relations, UlasTrade or other facts only where the vacancy makes them relevant.
+
+STYLE
+- First person natural English. Short, confident, factual and human.
+- Mention only the company name and position title where useful. Never show a URL, domain, hyperlink, citation, source marker or job-board name.
+- Paraphrase the employer's requirement; do not copy long vacancy wording.
+- Make the match concrete: "you need X; I have done Y" logic without sounding formulaic.
+- No invented achievements, percentages, team sizes, software, languages or responsibilities.
+- Intro <=50 words. Each point <=42 words, ideally 1-2 sentences.
+- No Dear/Sincerely/contact details/closing paragraph.
 
 OUTPUT EXACTLY:
 INTRO: ...
@@ -464,21 +494,21 @@ NUMBER: 01
 TITLE: ...
 TEXT: ...
 
-Repeat ---POINT--- through NUMBER: 07. No markdown and no extra commentary.`;
+Repeat through NUMBER: 07. Plain text only. No links, citations or markdown.`;
 }
 
 function parseMsOutput(text) {
   const raw = String(text || "").trim();
   const introMatch = raw.match(/INTRO:\s*([\s\S]*?)(?=\n---POINT---)/i);
-  const intro = String(introMatch?.[1] || "").replace(/\s+/g, " ").trim();
+  const intro = cleanGeneratedText(introMatch?.[1] || "");
   const points = raw.split("---POINT---").slice(1).map(block => {
     const number = (block.match(/NUMBER:\s*(\d{1,2})/i) || [])[1] || "";
     const title = (block.match(/TITLE:\s*([^\n]+)/i) || [])[1] || "";
     const textMatch = block.match(/TEXT:\s*([\s\S]*?)(?=$|\n---POINT---)/i);
     return {
       number: String(number).padStart(2,"0"),
-      title: String(title).replace(/\s+/g," ").trim(),
-      text: String(textMatch?.[1] || "").replace(/\s+/g," ").trim()
+      title: cleanGeneratedLabel(title),
+      text: cleanGeneratedText(textMatch?.[1] || "")
     };
   }).filter(p => p.title && p.text);
 
@@ -627,20 +657,18 @@ async function generateMotivationStatement(req, res) {
 
 
 function buildAskPrompt(url) {
-  return `Analyze this exact job-vacancy URL for Ulas Atilgan:
+  return `Analyze this exact vacancy for Ulas Atilgan. Use the URL only to inspect the vacancy:
 ${url}
 
 ${CANDIDATE}
 
 TASK
-- Inspect the exact link with live web search. If needed, cross-check company + exact vacancy on its official/ATS page.
-- Identify the real role, employer, location and current status. Do not invent missing facts.
-- Score personal fit from 0.0 to 10.0. Judge realistic candidacy, transferable experience, seniority, language/location eligibility, work style, compensation/career upside and likely enjoyment.
-- Be demanding: a famous company is not enough. Penalize major must-have gaps.
-- Explain fit in exactly 3 short, concrete reasons, written for the candidate.
-- If the vacancy is closed but identifiable, still analyze it and mark STATUS: CLOSED. If the role cannot be identified reliably, output STATUS: UNKNOWN.
-- Keep the supplied URL as DIRECT_URL.
-- English suitability should be factual. Belgian/EU citizenship means no Belgian sponsorship issue and is a mobility advantage in Europe.
+- Read the exact vacancy and cross-check the official/ATS version only if necessary.
+- Identify the correct position title and company.
+- Score fit 0.0-10.0 based on realistic candidacy, transferable experience, seniority, language/location eligibility, operational scope, career upside and likely enjoyment.
+- Give exactly 3 short, concrete reasons. Each reason must connect a real vacancy requirement/responsibility to a real candidate strength.
+- Be demanding and penalize major must-have gaps.
+- Never print or mention the URL, domain, website, source, citation or job-board name anywhere in the output.
 
 OUTPUT EXACTLY:
 STATUS: OPEN
@@ -653,9 +681,8 @@ SCORE: 8.4
 WHY_FIT_1: ...
 WHY_FIT_2: ...
 WHY_FIT_3: ...
-DIRECT_URL: ${url}
 
-No markdown and no extra commentary.`;
+Plain text only. No links, citations or extra commentary.`;
 }
 
 function parseAskOutput(text, originalUrl) {
@@ -670,7 +697,7 @@ function parseAskOutput(text, originalUrl) {
   const status = String(fields.STATUS || "UNKNOWN").toUpperCase();
   const score = Math.round(Math.max(0, Math.min(10, Number(fields.SCORE) || 0)) * 10) / 10;
   const whyFit = [fields.WHY_FIT_1,fields.WHY_FIT_2,fields.WHY_FIT_3]
-    .map(v=>String(v||"").replace(/\s+/g," ").trim()).filter(Boolean);
+    .map(v=>cleanGeneratedText(v)).filter(Boolean);
 
   if (!fields.TITLE || !fields.COMPANY || whyFit.length < 2 || !Number.isFinite(score)) {
     throw new Error("Could not identify and evaluate this vacancy reliably.");
@@ -678,11 +705,11 @@ function parseAskOutput(text, originalUrl) {
 
   return {
     status,
-    title:String(fields.TITLE).trim(),
-    company:String(fields.COMPANY).trim(),
-    location:String(fields.LOCATION||"").trim(),
+    title:cleanGeneratedLabel(fields.TITLE),
+    company:cleanGeneratedLabel(fields.COMPANY),
+    location:cleanGeneratedLabel(fields.LOCATION||""),
     publishedDate:/^\d{4}-\d{2}-\d{2}$/.test(String(fields.PUBLISHED_DATE||"").trim()) ? String(fields.PUBLISHED_DATE).trim() : "",
-    languageCheck:String(fields.LANGUAGE_CHECK||"").trim(),
+    languageCheck:cleanGeneratedText(fields.LANGUAGE_CHECK||""),
     score,
     whyFit:whyFit.slice(0,3),
     url:normalizeUrl(originalUrl)
@@ -705,7 +732,7 @@ async function analyzeAskLink(req, res) {
         tools: [{ type: "web_search", search_context_size: "low" }],
         tool_choice: "required",
         input: buildAskPrompt(url),
-        max_output_tokens: 1200
+        max_output_tokens: 900
       })
     });
     const job = parseAskOutput(extractOutputText(data), url);
