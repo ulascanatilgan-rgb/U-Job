@@ -10,13 +10,13 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.6.2-ask-visible";
+const APP_VERSION = "3.7.0-reasonable-10-ask";
 
 const MODES = {
   reasonable: {
     label: "Reasonable",
-    geography: "Kapellen, Brasschaat and Antwerp first; then Mechelen and Brussels; wider Belgium only for an unusually strong fit.",
-    focus: "Fintech-heavy, realistic next-step roles with strong ownership and people/stakeholder contact. Prioritise Business Operations Manager, Strategy & Operations, Operations Manager, Business Manager, Chief of Staff, founder or executive right-hand, Product Operations, Customer Operations, fintech operations, payments operations, implementation, partnerships and operational programme roles. Search fintechs, payments companies, financial technology scale-ups and founder-led technology businesses first, but allow any sector when the role is an unusually strong match. Value international environments, visible impact, process building, automation, cross-functional ownership and a path toward broader leadership. Avoid repetitive back-office roles, pure audit/compliance and narrow IAM administration."
+    geography: "Belgium, with Antwerp/Kapellen/Brasschaat and Brussels first; Mechelen/Ghent/Leuven next. Hybrid roles are welcome.",
+    focus: "Fintech-first realistic next-step roles. Highest priority: Business Operations Manager and Strategy & Operations. Then search Product Operations, Payments Operations, Customer/Client Operations, Implementation, Business Manager, Chief of Staff, Strategic Partnerships, Programme/Project Operations, Transformation Operations and high-ownership operational roles in fintech, payments, digital banking, wealth/investment tech, regtech, insurtech and financial infrastructure. The candidate should be able to compete strongly using banking, audit/control, fraud, IAM/security, stakeholder management, project/process ownership, analytics, entrepreneurship and AI/automation experience. Prefer dynamic international teams, visible ownership, people contact and career progression. Avoid junior/repetitive back-office roles, narrow IAM-only roles and pure compliance/audit jobs unless the scope is broader and strategically attractive."
   },
   creative: {
     label: "Creative",
@@ -186,7 +186,9 @@ function buildPrompt(mode, seenUrls) {
 
   const seen = seenUrls.slice(-80).map(normalizeUrl).filter(Boolean);
   const maxAge = mode === "linkedin" ? 7 : (mode === "global" || mode === "swmo") ? 30 : 60;
-  const target = mode === "global" || mode === "swmo" ? 9 : 7;
+  const target = mode === "reasonable" ? 12 : (mode === "global" || mode === "swmo") ? 9 : 7;
+  const finalTarget = mode === "reasonable" ? "6-10" : "3-5";
+  const stopAt = mode === "reasonable" ? 10 : 5;
 
   const special = mode === "linkedin"
     ? "LINKEDIN: LinkedIn job pages only; <=7 days; final URL must be the LinkedIn vacancy."
@@ -205,18 +207,20 @@ GEOGRAPHY: ${cfg.geography}
 ${special}
 
 SEARCH PLAN
-- Discover about ${target} serious candidates, then return the best 3-5. Stop once 5 strong verified roles are found.
-- Search source groups efficiently: official employer/institution pages + direct ATS first; then specialist recruiter/sector boards; use broad job platforms only for discovery/cross-check.
-- If fewer than 3 valid roles are found, exhaust the relevant source groups before returning.
+- Discover about ${target} serious candidates, then return the best ${finalTarget}. Stop once ${stopAt} strong verified roles are found.
+- Search source groups efficiently. Use discovery platforms to find candidates, but verify final roles on official/ATS pages whenever possible. Do not repeatedly search the same source/query family.
+- If fewer than 3 valid roles are found, exhaust the relevant source groups before returning. For Reasonable, continue through all three focused waves unless 10 strong verified roles are already found.
 - Freshness: prefer <=7 days, then <=14, then <=30; max age ${maxAge} days. LinkedIn never exceeds 7 days.
 - Verify EACH final role: exact YYYY-MM-DD publication date, vacancy still open, direct application page, English sufficient, no mandatory extra language, real profile fit.
 - Reject stale/closed/generic-careers pages, guessed dates, major must-have gaps, junior/repetitive roles and irrelevant matches.
-- Prefer unseen roles. Seen URLs may be reused only if still live and needed for a strong 3-5 result set.
+- Prefer unseen roles. Seen URLs may be reused only if still live and needed for a strong result set.
 - Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : "6.5"}.
 - WHY_FIT lines must be short and specific: profile fit; work/scope appeal; career/compensation leverage. Never invent salary.
 
 MODE-SPECIFIC SOURCE PRIORITY
-- Reasonable: fintech/payments/scale-ups; Business Ops, Strategy & Ops, Chief of Staff, Product/Customer Ops.
+- Reasonable WAVE 1: fintech/payments/digital-bank companies + exact Business Operations Manager, Business Operations, Strategy & Operations, Operations Manager.
+- Reasonable WAVE 2: same sectors + Product Ops, Payments Ops, Implementation, Customer/Client Ops, Partnerships, Business Manager, Chief of Staff, Transformation/Programme Ops.
+- Reasonable WAVE 3: adjacent high-fit roles at strong fintech/payment/financial-infrastructure employers. Discovery sources may include LinkedIn Jobs, Welcome to the Jungle, Wellfound and current recruiter boards such as Robert Walters, Hays and Michael Page; then cross-check the employer/ATS vacancy.
 - Corporate: bank career pages first; senior operations, transformation, investment/product ops, payments, risk-tech.
 - AI: AI/GenAI product, operations, transformation, governance, implementation.
 - Prestige: EU/NATO-adjacent, central banks, banking associations, policy institutes, think tanks, trade bodies, international organisations.
@@ -247,7 +251,7 @@ WHY_FIT_1: ...
 WHY_FIT_2: ...
 WHY_FIT_3: ...
 
-If fewer than 3 roles survive only after fully checking the relevant sources, return those valid roles. If none survive: NO_VERIFIED_JOBS.`;
+For Reasonable, return up to 10 verified roles; for every other mode return up to 5. If fewer than 3 roles survive only after fully checking the relevant sources, return those valid roles. If none survive: NO_VERIFIED_JOBS.`;
 }
 
 function parseVerifiedJobs(text) {
@@ -301,7 +305,7 @@ FINAL CHECK BEFORE OUTPUT
 - LinkedIn: <=7 days and LinkedIn job URL.
 - Global: <=30 days and explicit Belgium/EU/Europe/EMEA remote eligibility.
 - SW-MO: <=30 days and realistic Belgian/EU-citizen mobility.
-- Prefer 5 excellent roles; 3-4 is acceptable. Never pad with weak/stale roles.
+- ${mode === "reasonable" ? "Reasonable: aim for 6-10 excellent roles, maximum 10." : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
 - Do not output rejected roles or commentary.`;
 }
 
@@ -399,7 +403,7 @@ function finalizeJobsFromResponse(data, mode = "") {
       return true;
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, 5);
+    .slice(0, mode === "reasonable" ? 10 : 5);
 }
 
 
@@ -762,7 +766,7 @@ async function startSearch(req, res) {
         }],
         tool_choice: "required",
         input: strictPrompt,
-        max_output_tokens: 3200
+        max_output_tokens: mode === "reasonable" ? 3600 : 3200
       })
     });
 
