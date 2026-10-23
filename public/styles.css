@@ -289,3 +289,16 @@ h1{margin:0 0 7px;font-size:29px;line-height:1;font-weight:680;letter-spacing:-.
   .ask-inline{width:43px;height:43px;flex-basis:43px}
   .ask-panel{left:14px;right:14px;top:210px;bottom:auto;width:auto;max-height:calc(100vh - 230px)}
 }
+
+/* Ask visibility refinement */
+.utility-row{min-height:52px}
+.ask-inline{
+  flex-basis:52px!important;width:52px!important;height:52px!important;
+  background:linear-gradient(145deg,#81264d,#5b1535)!important;
+  font-size:11px!important;font-weight:760!important;
+  border:1px solid rgba(91,21,53,.18)!important;
+  box-shadow:0 9px 22px rgba(91,21,53,.24),inset 0 1px 0 rgba(255,255,255,.22)!important
+}
+@media(max-width:520px){
+  .ask-inline{flex-basis:50px!important;width:50px!important;height:50px!important}
+}
