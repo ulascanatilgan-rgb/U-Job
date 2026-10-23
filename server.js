@@ -623,9 +623,9 @@ async function generateMotivationStatement(req, res) {
   const body = await readJson(req);
   const rawJob = body?.job || {};
   const job = {
-    title: String(rawJob.title || "").trim().slice(0,180),
-    company: String(rawJob.company || "").trim().slice(0,140),
-    location: String(rawJob.location || "").trim().slice(0,140),
+    title: cleanGeneratedLabel(String(rawJob.title || "").slice(0,180)),
+    company: cleanGeneratedLabel(String(rawJob.company || "").slice(0,140)),
+    location: cleanGeneratedLabel(String(rawJob.location || "").slice(0,140)),
     url: normalizeUrl(rawJob.url),
     publishedDate: String(rawJob.publishedDate || "").trim().slice(0,20)
   };
