@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.7.0-reasonable-10-ask";
+const APP_VERSION = "3.8.0-fintech-mode";
 
 const MODES = {
   reasonable: {
@@ -27,6 +27,11 @@ const MODES = {
     label: "Corporate",
     geography: "Antwerp and Brussels first; then Ghent, Leuven and wider Belgium for strong banking roles.",
     focus: "Banking-sector focused roles that make strong use of the candidate's 12+ years across banking, internal audit, fraud, internal control, IAM/access operations, IT risk/security and fintech. Search banks and banking groups intensively before adjacent sectors: Belgian banks, international banks with Belgian offices, digital banks, private banks, investment banks, custody/securities institutions and bank-owned technology or transformation teams. Prioritise senior operations, business management, transformation, programme/project leadership, investment/product operations, payments, financial-crime technology, security governance, controls, risk-tech and strategic operations. Prefer roles with management exposure, cross-functional ownership and compensation/career progression. Avoid junior roles, narrow back-office IAM work and positions fundamentally dependent on mandatory Dutch/French."
+  },
+  fintech: {
+    label: "Fintech",
+    geography: "Belgium only. Prioritise Antwerp and Brussels, then Mechelen, Ghent, Leuven and other Belgian locations for exceptional fit. Hybrid Belgium-based roles are welcome.",
+    focus: "Dedicated fintech mode. Search current roles at fintech, payments, digital banking, wealth/investment technology, regtech, insurtech, financial-infrastructure, embedded-finance and banking-technology companies. Prioritise roles where the candidate can be genuinely competitive: Business Operations, Strategy & Operations, Operations Manager, Product Operations, Payments Operations, Customer/Client Operations, Implementation, Business Manager, Chief of Staff, Strategic Partnerships, Programme/Project Operations, Transformation, Financial Crime Technology, Security/Risk Governance and other high-ownership cross-functional roles. Use the candidate's banking, audit/control, fraud, IAM/security, stakeholder management, project/process ownership, analytics, entrepreneurship and AI/automation background as transferable evidence. Strongly prefer dynamic international teams, visible ownership, strong compensation/career progression and English-speaking environments. Reject junior roles, repetitive back-office work, narrow IAM-only roles and vacancies requiring mandatory fluent Dutch or French."
   },
   ai: {
     label: "AI",
@@ -215,13 +220,14 @@ SEARCH PLAN
 - Reject stale/closed/generic-careers pages, guessed dates, major must-have gaps, junior/repetitive roles and irrelevant matches.
 - Prefer unseen roles. Seen URLs may be reused only if still live and needed for a strong result set.
 - Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : "6.5"}.
+- Fintech mode: the employer/business must genuinely operate in fintech, payments, digital banking, regtech, insurtech, wealth-tech, financial infrastructure or closely related financial technology; do not fill with ordinary banks unless the role sits in a clearly fintech/technology venture or product unit.
 - WHY_FIT lines must be short and specific: profile fit; work/scope appeal; career/compensation leverage. Never invent salary.
 
 MODE-SPECIFIC SOURCE PRIORITY
 - Reasonable WAVE 1: fintech/payments/digital-bank companies + exact Business Operations Manager, Business Operations, Strategy & Operations, Operations Manager.
 - Reasonable WAVE 2: same sectors + Product Ops, Payments Ops, Implementation, Customer/Client Ops, Partnerships, Business Manager, Chief of Staff, Transformation/Programme Ops.
 - Reasonable WAVE 3: adjacent high-fit roles at strong fintech/payment/financial-infrastructure employers. Discovery sources may include LinkedIn Jobs, Welcome to the Jungle, Wellfound and current recruiter boards such as Robert Walters, Hays and Michael Page; then cross-check the employer/ATS vacancy.
-- Corporate: bank career pages first; senior operations, transformation, investment/product ops, payments, risk-tech.
+- Corporate: bank career pages first; senior operations, transformation, investment/product ops, payments, risk-tech.\n- Fintech: fintech/payments/digital-bank/regtech/wealth-tech company career pages and ATS first; then LinkedIn Jobs, Welcome to the Jungle, Wellfound and specialist/recruiter discovery; verify on official vacancy pages.
 - AI: AI/GenAI product, operations, transformation, governance, implementation.
 - Prestige: EU/NATO-adjacent, central banks, banking associations, policy institutes, think tanks, trade bodies, international organisations.
 - High Paid: senior/executive recruiter + employer pages; high-scope manager/lead/head roles.
