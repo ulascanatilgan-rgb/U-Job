@@ -31,7 +31,7 @@ function mergeState(base,raw){
   return out;
 }
 function loadState(){let merged=emptyState();try{const stable=localStorage.getItem(STORAGE_KEY);if(stable)merged=mergeState(merged,JSON.parse(stable))}catch{}try{for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||key===STORAGE_KEY||!key.startsWith("ujob:"))continue;try{merged=mergeState(merged,JSON.parse(localStorage.getItem(key)||"{}"))}catch{}}}catch{}try{localStorage.setItem(STORAGE_KEY,JSON.stringify(merged))}catch{}return merged}
-function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}function esc(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}
+function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}function esc(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}function cleanAskUi(v){return String(v??"").replace(/https?:\/\/\S+/gi,"").replace(/www\.\S+/gi,"").replace(/cite[^]+/g,"").replace(/【[^】]+】/g,"").replace(/\s+/g," ").replace(/\s*[|·•-]\s*$/g,"").trim()}
 function fmtDate(value,withTime=false){if(!value)return"Not run yet";return new Intl.DateTimeFormat("en-BE",withTime?{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}:{day:"2-digit",month:"short",year:"numeric"}).format(new Date(value))}function renderToday(){if(!els.today)return;els.today.textContent=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Brussels",day:"2-digit",month:"long",year:"numeric"}).format(new Date())}
 function seenUrlsForMode(mode){return (state[mode]?.runs||[]).flatMap(run=>run.jobs.map(j=>j.url)).filter(Boolean).slice(-100)}
 function actionKey(job){return String(job?.url||"").trim()}
@@ -218,22 +218,19 @@ function addAskToWatchlist(job){
   const key=actionKey(job);if(!key)return;
   if(!state.actions)state.actions={};
   const existing=state.actions[key];
-  state.actions[key]={...job,sourceMode:"ask",appliedAt:existing?.appliedAt||new Date().toISOString()};
+  state.actions[key]={...job,title:cleanAskUi(job.title),company:cleanAskUi(job.company),location:cleanAskUi(job.location),whyFit:(job.whyFit||[]).map(cleanAskUi),sourceMode:"ask",appliedAt:existing?.appliedAt||new Date().toISOString()};
   saveState();renderAsk();if(activeView==="actions")render();
 }
 function askResultCard(item,history=false){
   const job=item&&item.job;if(!job)return"";
-  const key=actionKey(job),watched=Boolean(state.actions?.[key]),status=String(job.status||"").toUpperCase();
-  const reasons=(job.whyFit||[]).map(v=>"<p>"+esc(v)+"</p>").join("");
-  const statusHtml=status?"<span class=\"ask-status "+(status==="OPEN"?"open":"closed")+"\">"+esc(status)+"</span>":"";
-  const dateHtml=job.publishedDate?"<span>"+esc(job.publishedDate)+"</span>":"";
-  const locHtml=job.location?" · "+esc(job.location):"";
-  const langHtml=job.languageCheck?"<div class=\"ask-language\">"+esc(job.languageCheck)+"</div>":"";
+  const key=actionKey(job),watched=Boolean(state.actions?.[key]);
+  const title=cleanAskUi(job.title),company=cleanAskUi(job.company);
+  const reasons=(job.whyFit||[]).map(v=>"<p>"+esc(cleanAskUi(v))+"</p>").join("");
   return "<article class=\"ask-result-card"+(history?" ask-history-card":"")+"\">"+
     "<div class=\"ask-score\">"+esc(Number(job.score||0).toFixed(1))+"</div>"+
-    "<div class=\"ask-result-main\"><div class=\"ask-result-topline\">"+statusHtml+dateHtml+"</div>"+
-    "<h3>"+esc(job.title)+"</h3><div class=\"ask-meta\">"+esc(job.company)+locHtml+"</div>"+
-    "<div class=\"ask-reasons\">"+reasons+"</div>"+langHtml+
+    "<div class=\"ask-result-main\"><h3>"+esc(title)+"</h3>"+
+    "<div class=\"ask-meta\">"+esc(company)+"</div>"+
+    "<div class=\"ask-reasons\">"+reasons+"</div>"+
     "<div class=\"ask-actions\"><a href=\""+esc(job.url)+"\" target=\"_blank\" rel=\"noopener noreferrer\">Open job ↗</a>"+
     "<button type=\"button\" data-ask-watch=\""+esc(key)+"\" "+(watched?"disabled":"")+">"+(watched?"In Watchlist":"Add to Watchlist")+"</button></div></div></article>";
 }
@@ -472,7 +469,7 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=42",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=43",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.actionsButton?.addEventListener("click",showActions);
 els.run.addEventListener("click",runSearch);
