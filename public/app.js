@@ -1,4 +1,4 @@
-const MODES={reasonable:{title:"Reasonable",hint:"Fintech, business operations and Chief of Staff-style roles."},creative:{title:"Creative",hint:"Niche, hands-on, dream-job territory."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Institutions, policy, finance, security and international influence."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
+const MODES={reasonable:{title:"Reasonable",hint:"Fintech-first Business Operations & Strategy roles — up to 10 verified matches."},creative:{title:"Creative",hint:"Niche, hands-on, dream-job territory."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Institutions, policy, finance, security and international influence."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
 const STORAGE_KEY="ujob:data";let state=loadState();let activeMode=state.activeMode||"reasonable";let activeView=state.activeView||activeMode;const msBusy=new Set();let askBusy=false;const modeStatus={reasonable:"",creative:"",corporate:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={reasonable:null,creative:null,corporate:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
 const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory")};
 function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}
@@ -346,8 +346,9 @@ function completeModeSearch(mode,data){
   saveState();
   clearPoll(mode);
 
-  modeStatus[mode]=jobs.length===5
-    ?"5 verified matches."
+  const targetMax=mode==="reasonable"?10:5;
+  modeStatus[mode]=jobs.length===targetMax
+    ?String(targetMax)+" verified matches."
     :jobs.length>0
       ?String(jobs.length)+" verified matches found."
       :"Search completed but no verified roles were returned.";
@@ -471,7 +472,7 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=40",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=41",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.actionsButton?.addEventListener("click",showActions);
 els.run.addEventListener("click",runSearch);
