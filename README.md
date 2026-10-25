@@ -59,3 +59,5 @@ The app listens on Railway's PORT variable and falls back to port 3000 locally.
 <!-- deploy-trigger: ujob-3.8.0-fintech-mode -->
 
 <!-- deploy-trigger: ujob-3.8.1-clean-ask-ms -->
+
+<!-- deploy-trigger: ujob-3.9.0-prestige-power-search -->
