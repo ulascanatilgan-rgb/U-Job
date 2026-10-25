@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.8.1-clean-ask-ms";
+const APP_VERSION = "3.9.0-prestige-power-search";
 
 const MODES = {
   reasonable: {
@@ -40,8 +40,8 @@ const MODES = {
   },
   prestige: {
     label: "Prestige",
-    geography: "Belgium only, primarily Brussels; Antwerp and wider Belgium when the institution or role has strong national or international relevance.",
-    focus: "Broad prestige and institutional mode combining policy, politics, finance, security and international affairs. Search respected institutions and reputation-building employers such as NATO and NATO-adjacent bodies, EU institutions/agencies and European Commission related organisations, National Bank of Belgium and other central-bank/financial-policy bodies, banking federations and associations, chambers of commerce, government-linked agencies, embassies and diplomatic missions when publicly recruiting, international organisations, defence/security organisations, geopolitical and intelligence/security consultancies, major think tanks, trade associations, public-affairs organisations, policy institutes, royal foundations or royal-household related organisations when publicly recruiting, strategic partnerships teams and other internationally connected institutions. Strong role families include Policy Advisor, Financial Services Policy, Programme Officer/Manager, Institutional Relations, EU/Public Affairs, Government Affairs, Strategic Partnerships, Stakeholder Relations, Regulatory Strategy, Geopolitical/Strategic Risk, Security Governance, Business/Operations Management and policy implementation. Use the candidate's International Relations degree together with banking, audit, fraud, IAM/security, technology and stakeholder-management background. Prioritise reputation, international network, senior stakeholder exposure and realistic career leverage. Reject jobs requiring Belgian nationality, sworn police/military status, an already-active security clearance, mandatory fluent Dutch/French, a diplomatic career track, or specialist legal/doctoral credentials the candidate lacks."
+    geography: "Belgium first, especially Brussels and internationally connected institutions. If Belgium does not yield enough exceptional matches, allow other EU member states only for unusually strong English-speaking roles with clear EU-citizen eligibility and major prestige/career leverage.",
+    focus: "Institutional power-track roles with international prestige, senior stakeholder exposure, visible responsibility and upward mobility. Search European Defence Agency, NATO and NATO bodies/agencies, EU institutions and agencies, European Commission, European Parliament, Council/EEAS-related bodies, central banks and financial-policy institutions, defence/security institutions, Belgian and allied defence ministries where civilian vacancies are public, embassies and diplomatic missions in Belgium, permanent representations, international organisations, chambers of commerce, banking/financial federations, major trade associations, geopolitical/security organisations, respected think tanks, policy institutes, public-affairs organisations and other high-reputation institutions. Prioritise professional roles such as Programme/Project Officer or Manager, Business/Operations Manager, Policy/Programme Advisor, Institutional Relations, Stakeholder Relations, Strategic Partnerships, Security Governance, Financial Services Policy, Regulatory Strategy, EU/Public Affairs, Government Affairs, Geopolitical/Strategic Risk, Transformation, Digital/Technology Programme roles and operational policy implementation. Use the candidate's Belgian/EU citizenship, International Relations degree, ING/banking background, audit/fraud/control experience, IAM/security/technology knowledge, operations, stakeholder management and certifications as transferable strengths. Candidate is 35 years old: reject age-limited traineeships, graduate schemes or young-professional programmes where 35 is ineligible, but do not treat age as a negative when no age restriction exists. Belgian-nationality or EU-nationality requirements are acceptable because the candidate is Belgian/EU. Reject only genuine blockers such as sworn military/police status, specialist legal/doctoral requirements, an already-active clearance when mandatory before application, or mandatory professional Dutch/French that cannot be substituted by English."
   },
   highpaid: {
     label: "High Paid",
@@ -71,7 +71,7 @@ const MODES = {
 };
 
 const CANDIDATE = `Candidate:
-- Kapellen, Belgium; Belgian/EU citizen; fluent English.
+- Kapellen, Belgium; Belgian/EU citizen; age 35; fluent English.
 - 12+ years: ING Belgium + banking, audit, fraud, internal control, IAM/access, IT risk/security, fintech.
 - BA Business Administration + BA International Relations + MSc Information Technologies (ML); CISA/CIA/CIAM/CFE/CFSA/CMB3.
 - Strong operations, stakeholder management, process improvement, data/AI automation; builds OpenAI/GitHub/Railway apps; entrepreneurial.
@@ -176,6 +176,7 @@ function cleanJob(job) {
     languageCheck: String(job?.languageCheck || "").trim(),
     remoteCheck: String(job?.remoteCheck || "").trim(),
     mobilityCheck: String(job?.mobilityCheck || "").trim(),
+    ageCheck: String(job?.ageCheck || "").trim(),
     score: Math.round(Math.max(0, Math.min(10, Number(job?.score) || 0)) * 10) / 10,
     whyFit: Array.isArray(job?.whyFit)
       ? job.whyFit.slice(0, 3).map(v => String(v).trim()).filter(Boolean)
@@ -191,9 +192,9 @@ function buildPrompt(mode, seenUrls) {
 
   const seen = seenUrls.slice(-80).map(normalizeUrl).filter(Boolean);
   const maxAge = mode === "linkedin" ? 7 : (mode === "global" || mode === "swmo") ? 30 : 60;
-  const target = mode === "reasonable" ? 12 : (mode === "global" || mode === "swmo") ? 9 : 7;
-  const finalTarget = mode === "reasonable" ? "6-10" : "3-5";
-  const stopAt = mode === "reasonable" ? 10 : 5;
+  const target = mode === "prestige" ? 15 : mode === "reasonable" ? 12 : (mode === "global" || mode === "swmo") ? 9 : 7;
+  const finalTarget = (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
+  const stopAt = (mode === "reasonable" || mode === "prestige") ? 10 : 5;
 
   const special = mode === "linkedin"
     ? "LINKEDIN: LinkedIn job pages only; <=7 days; final URL must be the LinkedIn vacancy."
@@ -201,7 +202,9 @@ function buildPrompt(mode, seenUrls) {
       ? "GLOBAL: remote must explicitly allow Belgium/EU/Europe/EMEA; reject US/UK/Swiss-only remote. Prefer elite US/UK/Swiss/global employers and Europe-facing teams. REMOTE_CHECK is mandatory."
       : mode === "swmo"
         ? "SW-MO: Switzerland/Monaco only; English sufficient; reject mandatory German/French/Italian. Belgian/EU citizen: Swiss sponsorship is not required; normal EU/EFTA registration is acceptable. Monaco local-only restrictions still matter. MOBILITY_CHECK is mandatory."
-        : "";
+        : mode === "prestige"
+          ? "PRESTIGE: Belgium first. Candidate is Belgian/EU citizen and age 35. Belgian/EU-nationality requirements are acceptable. Reject only if an explicit age cap makes age 35 ineligible, or another hard eligibility requirement is not met. AGE_CHECK is mandatory."
+          : "";
 
   return `Find CURRENT vacancies using live web search.
 TODAY: ${today}
@@ -214,12 +217,13 @@ ${special}
 SEARCH PLAN
 - Discover about ${target} serious candidates, then return the best ${finalTarget}. Stop once ${stopAt} strong verified roles are found.
 - Search source groups efficiently. Use discovery platforms to find candidates, but verify final roles on official/ATS pages whenever possible. Do not repeatedly search the same source/query family.
-- If fewer than 3 valid roles are found, exhaust the relevant source groups before returning. For Reasonable, continue through all three focused waves unless 10 strong verified roles are already found.
+- If fewer than 3 valid roles are found, exhaust the relevant source groups before returning. For Reasonable and Prestige, continue through all focused waves unless 10 strong verified roles are already found.
 - Freshness: prefer <=7 days, then <=14, then <=30; max age ${maxAge} days. LinkedIn never exceeds 7 days.
 - Verify EACH final role: exact YYYY-MM-DD publication date, vacancy still open, direct application page, English sufficient, no mandatory extra language, real profile fit.
 - Reject stale/closed/generic-careers pages, guessed dates, major must-have gaps, junior/repetitive roles and irrelevant matches.
 - Prefer unseen roles. Seen URLs may be reused only if still live and needed for a strong result set.
 - Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : "6.5"}.
+- Prestige mode: candidate is Belgian/EU citizen and age 35. Check explicit age, nationality, clearance and status requirements. Do not reject Belgian/EU nationality requirements. Reject age-capped programmes if 35 is outside the allowed range. Output AGE_CHECK with the eligibility conclusion.
 - Fintech mode: the employer/business must genuinely operate in fintech, payments, digital banking, regtech, insurtech, wealth-tech, financial infrastructure or closely related financial technology; do not fill with ordinary banks unless the role sits in a clearly fintech/technology venture or product unit.
 - WHY_FIT lines must be short and specific: profile fit; work/scope appeal; career/compensation leverage. Never invent salary.
 
@@ -227,9 +231,14 @@ MODE-SPECIFIC SOURCE PRIORITY
 - Reasonable WAVE 1: fintech/payments/digital-bank companies + exact Business Operations Manager, Business Operations, Strategy & Operations, Operations Manager.
 - Reasonable WAVE 2: same sectors + Product Ops, Payments Ops, Implementation, Customer/Client Ops, Partnerships, Business Manager, Chief of Staff, Transformation/Programme Ops.
 - Reasonable WAVE 3: adjacent high-fit roles at strong fintech/payment/financial-infrastructure employers. Discovery sources may include LinkedIn Jobs, Welcome to the Jungle, Wellfound and current recruiter boards such as Robert Walters, Hays and Michael Page; then cross-check the employer/ATS vacancy.
-- Corporate: bank career pages first; senior operations, transformation, investment/product ops, payments, risk-tech.\n- Fintech: fintech/payments/digital-bank/regtech/wealth-tech company career pages and ATS first; then LinkedIn Jobs, Welcome to the Jungle, Wellfound and specialist/recruiter discovery; verify on official vacancy pages.
+- Corporate: bank career pages first; senior operations, transformation, investment/product ops, payments, risk-tech.
+- Fintech: fintech/payments/digital-bank/regtech/wealth-tech company career pages and ATS first; then LinkedIn Jobs, Welcome to the Jungle, Wellfound and specialist/recruiter discovery; verify on official vacancy pages.
 - AI: AI/GenAI product, operations, transformation, governance, implementation.
-- Prestige: EU/NATO-adjacent, central banks, banking associations, policy institutes, think tanks, trade bodies, international organisations.
+- Prestige WAVE 1 — power institutions in Belgium: NATO Careers and NATO bodies/agencies including NCIA/NSPA where relevant; European Defence Agency; EU Careers/EPSO; European Commission; European Parliament; Council/EEAS-related vacancies; EU agencies with Brussels/Belgium roles.
+- Prestige WAVE 2 — defence/diplomatic/international: Belgian/allied defence institutions with civilian vacancies, embassies and diplomatic missions in Belgium, permanent representations, international organisations, security/defence organisations and international programme offices.
+- Prestige WAVE 3 — financial/institutional influence: National Bank of Belgium/central-bank ecosystem, European financial institutions, banking/financial federations, chambers of commerce, major trade associations, regulatory/policy bodies and strategic institutional-relations teams.
+- Prestige WAVE 4 — policy/intellectual influence: respected think tanks, geopolitical/security institutes, public-affairs organisations, policy institutes and international advisory bodies.
+- Prestige WAVE 5 — only if Belgium yields fewer than 6 strong matches: search other EU member states for exceptional English-speaking EU/NATO/defence/international-institution roles where Belgian/EU citizenship makes the candidate clearly eligible.
 - High Paid: senior/executive recruiter + employer pages; high-scope manager/lead/head roles.
 - Turkish: Belgium roles where Turkish/Turkey-market exposure is commercially useful.
 - Creative: boutique/premium/luxury/automotive/yacht/travel/sport/founder-led operational roles.
@@ -250,6 +259,7 @@ LOCATION: ...
 DIRECT_URL: https://...
 PUBLISHED_DATE: YYYY-MM-DD
 LANGUAGE_CHECK: English sufficient; no other language mandatory.
+AGE_CHECK: ${mode === "prestige" ? "Eligible at age 35; explicit age rule checked: ..." : "N/A"}
 REMOTE_CHECK: ${mode === "global" ? "Belgium/Europe/EMEA eligibility verified: ..." : "N/A"}
 MOBILITY_CHECK: ${mode === "swmo" ? "Belgian/EU-citizen eligibility: ..." : "N/A"}
 SCORE: 8.7
@@ -257,7 +267,7 @@ WHY_FIT_1: ...
 WHY_FIT_2: ...
 WHY_FIT_3: ...
 
-For Reasonable, return up to 10 verified roles; for every other mode return up to 5. If fewer than 3 roles survive only after fully checking the relevant sources, return those valid roles. If none survive: NO_VERIFIED_JOBS.`;
+For Reasonable and Prestige, return up to 10 verified roles; for every other mode return up to 5. If fewer than 3 roles survive only after fully checking the relevant sources, return those valid roles. If none survive: NO_VERIFIED_JOBS.`;
 }
 
 function parseVerifiedJobs(text) {
@@ -291,6 +301,7 @@ function parseVerifiedJobs(text) {
       url: fields.DIRECT_URL || "",
       publishedDate: fields.PUBLISHED_DATE || "",
       languageCheck: fields.LANGUAGE_CHECK || "",
+      ageCheck: fields.AGE_CHECK || "",
       remoteCheck: fields.REMOTE_CHECK || "",
       mobilityCheck: fields.MOBILITY_CHECK || "",
       score: Number.isFinite(score) ? score : 0,
@@ -311,7 +322,8 @@ FINAL CHECK BEFORE OUTPUT
 - LinkedIn: <=7 days and LinkedIn job URL.
 - Global: <=30 days and explicit Belgium/EU/Europe/EMEA remote eligibility.
 - SW-MO: <=30 days and realistic Belgian/EU-citizen mobility.
-- ${mode === "reasonable" ? "Reasonable: aim for 6-10 excellent roles, maximum 10." : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
+- PRESTIGE: candidate is Belgian/EU citizen, age 35. Check explicit age/nationality/clearance/status rules. Reject only if a real rule makes the candidate ineligible; Belgian/EU-nationality requirements are acceptable.
+- ${(mode === "reasonable" || mode === "prestige") ? (mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: aim for 6-10 excellent roles, maximum 10.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
 - Do not output rejected roles or commentary.`;
 }
 
@@ -394,6 +406,12 @@ function finalizeJobsFromResponse(data, mode = "") {
     .filter(job => mode !== "global" || hasVerifiedEuropeRemote(job))
     .filter(job => mode !== "swmo" || hasRealisticSwmoMobility(job))
     .filter(job => {
+      if (mode !== "prestige") return true;
+      const age = String(job.ageCheck || "");
+      if (!age) return false;
+      return !/\b(ineligible|not eligible|too old|maximum age\s*(?:of|is|:)?\s*(?:18|19|2\d|3[0-4])|under\s*35|younger than\s*35)\b/i.test(age);
+    })
+    .filter(job => {
       const lang = String(job.languageCheck || "");
       const cleaned = lang
         .replace(/\bnot\s+(mandatory|required)\b/gi, "")
@@ -409,7 +427,7 @@ function finalizeJobsFromResponse(data, mode = "") {
       return true;
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, mode === "reasonable" ? 10 : 5);
+    .slice(0, (mode === "reasonable" || mode === "prestige") ? 10 : 5);
 }
 
 
@@ -799,7 +817,7 @@ async function startSearch(req, res) {
         }],
         tool_choice: "required",
         input: strictPrompt,
-        max_output_tokens: mode === "reasonable" ? 3600 : 3200
+        max_output_tokens: mode === "prestige" ? 3900 : mode === "reasonable" ? 3600 : 3200
       })
     });
 
