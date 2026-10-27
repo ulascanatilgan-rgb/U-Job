@@ -14,7 +14,7 @@ body{
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
   transition:background .22s ease
 }
-body[data-mode="creative"]{--accent:#a66a00;--accent-soft:#fff2d7;--accent-ink:#744900}
+body[data-mode="creative"]{--accent:#a66a00;--accent-soft:#fff2d7;--accent-ink:#744900}body[data-mode="kapellen"]{--accent:#486b56;--accent-soft:#e8f0eb;--accent-ink:#2d4c39}
 body[data-mode="corporate"]{--accent:#535966;--accent-soft:#eceef1;--accent-ink:#30343b}body[data-mode="fintech"]{--accent:#b4232f;--accent-soft:#f7e7e9;--accent-ink:#17191d}
 body[data-mode="ai"]{--accent:#7158d9;--accent-soft:#eeeafd;--accent-ink:#4a37a4}
 body[data-mode="linkedin"]{--accent:#0a66c2;--accent-soft:#e8f2fc;--accent-ink:#064d94}
@@ -72,7 +72,7 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
   box-shadow:0 5px 14px color-mix(in srgb,var(--mode-accent) 10%,transparent),inset 0 1px 0 rgba(255,255,255,.88)
 }
 .mode.reasonable{--mode-accent:#3867d6;--mode-soft:#e8efff}
-.mode.creative{--mode-accent:#a66a00;--mode-soft:#fff1d2}
+.mode.creative{--mode-accent:#a66a00;--mode-soft:#fff1d2}.mode.kapellen{--mode-accent:#486b56;--mode-soft:#e7efe9}
 .mode.corporate{--mode-accent:#515761;--mode-soft:#eceef1}.mode.fintech{--mode-accent:#b4232f;--mode-soft:#eee7e9}
 .mode.ai{--mode-accent:#7158d9;--mode-soft:#eeeafd}
 .mode.linkedin{--mode-accent:#0a66c2;--mode-soft:#e5f1fc}
