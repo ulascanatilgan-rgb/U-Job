@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.9.0-prestige-power-search";
+const APP_VERSION = "3.10.0-creative-kapellen-efficiency";
 
 const MODES = {
   reasonable: {
@@ -20,8 +20,13 @@ const MODES = {
   },
   creative: {
     label: "Creative",
-    geography: "Kapellen, Brasschaat, Antwerp and Antwerp port region first; wider Belgium only for an exceptional fit.",
-    focus: "Niche, boutique, practical and enjoyable roles in premium automotive, workshops or ateliers, yacht/marine, luxury brands, travel or experience agencies, interior/design/renovation, premium hospitality, sports/padel/leisure, animal or dog businesses, estates, family offices, founder-led companies and startups. Value client contact, operational ownership, technology, entrepreneurship, hands-on problem solving, design/renovation experience, cars, sport, travel and boutique dog-hotel experience."
+    geography: "Antwerp province first, especially Kapellen/Brasschaat/Schoten/Ekeren/Antwerp; wider Belgium only for an unusually strong creative/renovation fit.",
+    focus: "Hands-on, design-led and entrepreneurial roles. Search interior design, renovation, painting/decorating, interior finishing, flooring, microcement/plastering, cabinetry/joinery, carpentry, furniture/workshop/atelier, kitchen/interior fit-out, premium residential renovation, showroom/project operations and technical-commercial interior roles. Include Interior/Renovation Project Manager or Coordinator, Site/Works Coordinator, Operations/Workshop Manager, Project Support, Estimator/Planner, Client/Showroom Project roles and realistic skilled hands-on roles when formal trade credentials are not a hard blocker. Also retain strong-fit premium automotive, yacht/marine, luxury, travel/experience, premium hospitality, sports/leisure, estates, family offices, animal/dog businesses and founder-led companies. Use the candidate's real interior/renovation venture experience, entrepreneurship, customer contact, planning, hands-on problem solving, operational ownership and technology/automation mindset. Prefer roles with visible output, client contact and ownership; reject generic low-skill labour, junior apprenticeships and roles requiring a trade licence/certificate or deep specialist craft experience the candidate clearly lacks."
+  },
+  kapellen: {
+    label: "Kapellen",
+    geography: "Local-only: Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren; also Hoevenen, Mariaburg and Antwerp-North/Merksem only when the commute is clearly local to Kapellen. Do not return Brussels, Ghent, Leuven or distant Belgium roles.",
+    focus: "Find realistic nearby roles where this candidate can compete strongly and improve day-to-day quality of life through a short commute. Search across sectors rather than forcing one industry: Business/Operations Manager, Project/Programme Coordinator or Manager, Business Manager, Customer/Client Operations, Implementation, Partnerships, process/office operations, banking/financial services, fintech/payments, technology/security governance, logistics/port operations, premium service businesses, interior/renovation/project operations and entrepreneurial SME roles. Use 12+ years of banking/audit/fraud/control/IAM/security, stakeholder/project management, analytics, entrepreneurship, AI/automation and hands-on renovation experience. Prefer ownership, people contact, international or English-friendly environments and meaningful responsibility. Reject retail-store jobs, generic administrative work, junior roles, repetitive back-office work and positions with mandatory professional Dutch/French."
   },
   corporate: {
     label: "Corporate",
@@ -182,6 +187,60 @@ function cleanJob(job) {
       ? job.whyFit.slice(0, 3).map(v => String(v).trim()).filter(Boolean)
       : []
   };
+}
+
+const MODE_SOURCE_PLANS = {
+  "reasonable": [
+    "WAVE 1: fintech/payments/digital-bank employers + Business Operations, Strategy & Operations, Operations Manager.",
+    "WAVE 2: Product Ops, Payments Ops, Implementation, Customer/Client Ops, Partnerships, Business Manager, Chief of Staff, Transformation/Programme Ops in the same sectors.",
+    "WAVE 3: adjacent high-fit fintech/payment/financial-infrastructure roles; use LinkedIn, Welcome to the Jungle, Wellfound and Robert Walters/Hays/Michael Page for discovery, then verify official/ATS."
+  ],
+  "creative": [
+    "WAVE 1: interior design/renovation/fit-out companies, painting/decorating, flooring, microcement/plastering, cabinetry/joinery/carpentry, furniture/workshop/atelier and kitchen/interior companies in Antwerp province.",
+    "WAVE 2: Interior/Renovation Project Manager or Coordinator, Site/Works Coordinator, Operations/Workshop Manager, estimator/planner, showroom/client-project and technical-commercial interior roles.",
+    "WAVE 3: premium automotive, yacht/marine, luxury, hospitality/experience, estates, sports/leisure, animal/dog and founder-led businesses only with credible transferable fit.",
+    "Use employer sites, VDAB, Jobat, LinkedIn and specialist construction/interior recruiters for discovery; verify the final vacancy directly."
+  ],
+  "kapellen": [
+    "WAVE 1: exact-location searches for Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren across operations/project/business/customer roles.",
+    "WAVE 2: local employers/SMEs, banks/financial services, fintech/technology, logistics/port-related employers, premium services and renovation/interior firms; include Hoevenen/Mariaburg/Merksem only when clearly local.",
+    "WAVE 3: use VDAB, Jobat, LinkedIn Jobs, Indeed and local/specialist recruiters for discovery, then verify employer/ATS. Do not widen to distant cities."
+  ],
+  "corporate": [
+    "Bank/private-bank/international-bank career pages first; senior operations, business management, transformation, investment/product ops, payments, financial-crime technology, security governance and risk-tech."
+  ],
+  "fintech": [
+    "Fintech/payments/digital-bank/regtech/wealth-tech/financial-infrastructure company career pages and ATS first; then LinkedIn, Welcome to the Jungle, Wellfound and specialist recruiters for discovery; verify official vacancy."
+  ],
+  "ai": [
+    "AI/GenAI employers plus banking/fintech/consulting transformation teams for AI product, operations, transformation, governance, adoption, implementation and customer/partner roles."
+  ],
+  "prestige": [
+    "WAVE 1: NATO/NCIA/NSPA, European Defence Agency, EU Careers/EPSO, Commission, Parliament, Council/EEAS and EU agencies in Belgium.",
+    "WAVE 2: civilian defence/security institutions, embassies/diplomatic missions, permanent representations and international organisations.",
+    "WAVE 3: NBB/central-bank ecosystem, European financial institutions, banking federations, chambers, trade associations and policy/regulatory bodies.",
+    "WAVE 4: respected think tanks, geopolitical/security institutes, public-affairs and policy organisations.",
+    "WAVE 5 only if Belgium yields fewer than 6 strong matches: other EU states, English-speaking exceptional institutional roles with clear EU-citizen eligibility."
+  ],
+  "highpaid": [
+    "Senior/executive employer pages and recruiters for manager/lead/head, business management, transformation, strategic operations, fintech/payments, AI, technology/security and high-value client/partnership roles."
+  ],
+  "turkish": [
+    "Belgium roles at Turkey-linked employers or with Turkish clients/suppliers/market exposure; logistics/import-export, fintech/payments, banking, technology, operations, partnerships and account/client roles."
+  ],
+  "linkedin": [
+    "LinkedIn Jobs only for final discovery; cross-check employer/ATS when possible. Posting <=7 days; final link remains the LinkedIn vacancy."
+  ],
+  "global": [
+    "Global employer career pages plus Europe/EMEA-remote sources; explicit Belgium/EU/Europe/EMEA work eligibility mandatory."
+  ],
+  "swmo": [
+    "Swiss/Monaco banks, private banks, fintech/tech, luxury, family-office, international-organisation and specialist recruiter sources; verify English suitability and mobility."
+  ]
+};
+
+function getModeSourcePlan(mode) {
+  return (MODE_SOURCE_PLANS[mode] || []).map(v => "- " + v).join("\n");
 }
 
 function buildPrompt(mode, seenUrls) {
