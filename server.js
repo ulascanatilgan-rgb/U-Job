@@ -249,9 +249,9 @@ function buildPrompt(mode, seenUrls) {
     timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit"
   }).format(new Date());
 
-  const seen = seenUrls.slice(-80).map(normalizeUrl).filter(Boolean);
+  const seen = seenUrls.slice(-50).map(normalizeUrl).filter(Boolean);
   const maxAge = mode === "linkedin" ? 7 : (mode === "global" || mode === "swmo") ? 30 : 60;
-  const target = mode === "prestige" ? 15 : mode === "reasonable" ? 12 : (mode === "global" || mode === "swmo") ? 9 : 7;
+  const target = mode === "prestige" ? 15 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "creative" || mode === "fintech" || mode === "global" || mode === "swmo") ? 9 : 7;
   const finalTarget = (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
   const stopAt = (mode === "reasonable" || mode === "prestige") ? 10 : 5;
 
@@ -263,7 +263,11 @@ function buildPrompt(mode, seenUrls) {
         ? "SW-MO: Switzerland/Monaco only; English sufficient; reject mandatory German/French/Italian. Belgian/EU citizen: Swiss sponsorship is not required; normal EU/EFTA registration is acceptable. Monaco local-only restrictions still matter. MOBILITY_CHECK is mandatory."
         : mode === "prestige"
           ? "PRESTIGE: Belgium first. Candidate is Belgian/EU citizen and age 35. Belgian/EU-nationality requirements are acceptable. Reject only if an explicit age cap makes age 35 ineligible, or another hard eligibility requirement is not met. AGE_CHECK is mandatory."
-          : "";
+          : mode === "kapellen"
+            ? "KAPELLEN: final location must be in the specified local area. English must be sufficient; Dutch may be optional/preferred but not mandatory."
+            : mode === "fintech"
+              ? "FINTECH: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure."
+              : "";
 
   return `Find CURRENT vacancies using live web search.
 TODAY: ${today}
@@ -275,35 +279,22 @@ ${special}
 
 SEARCH PLAN
 - Discover about ${target} serious candidates, then return the best ${finalTarget}. Stop once ${stopAt} strong verified roles are found.
-- Search source groups efficiently. Use discovery platforms to find candidates, but verify final roles on official/ATS pages whenever possible. Do not repeatedly search the same source/query family.
-- If fewer than 3 valid roles are found, exhaust the relevant source groups before returning. For Reasonable and Prestige, continue through all focused waves unless 10 strong verified roles are already found.
+- Use ONLY the focused source plan below. Start each wave with one broad discovery query, then targeted verification. Avoid equivalent/repeated queries and do not re-search the same domain without a reason.
+- Prefer official employer/institution and direct ATS pages. Use job boards/recruiters mainly for discovery, then verify the final vacancy directly whenever possible.
+- Drop obvious location/language/seniority/skill mismatches early instead of spending web calls on them.
+- If fewer than 3 valid roles remain, complete the relevant waves before returning. Reasonable/Prestige may continue until 10 strong verified roles.
 - Freshness: prefer <=7 days, then <=14, then <=30; max age ${maxAge} days. LinkedIn never exceeds 7 days.
 - Verify EACH final role: exact YYYY-MM-DD publication date, vacancy still open, direct application page, English sufficient, no mandatory extra language, real profile fit.
 - Reject stale/closed/generic-careers pages, guessed dates, major must-have gaps, junior/repetitive roles and irrelevant matches.
 - Prefer unseen roles. Seen URLs may be reused only if still live and needed for a strong result set.
 - Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : "6.5"}.
 - Prestige mode: candidate is Belgian/EU citizen and age 35. Check explicit age, nationality, clearance and status requirements. Do not reject Belgian/EU nationality requirements. Reject age-capped programmes if 35 is outside the allowed range. Output AGE_CHECK with the eligibility conclusion.
-- Fintech mode: the employer/business must genuinely operate in fintech, payments, digital banking, regtech, insurtech, wealth-tech, financial infrastructure or closely related financial technology; do not fill with ordinary banks unless the role sits in a clearly fintech/technology venture or product unit.
+- Creative mode: hands-on trade roles are acceptable only with credible transferable experience; reject mandatory craft licences/certificates or deep specialist experience the candidate lacks.
+- Fintech mode: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure; ordinary banks qualify only for a clearly fintech/technology venture or product unit.
 - WHY_FIT lines must be short and specific: profile fit; work/scope appeal; career/compensation leverage. Never invent salary.
 
-MODE-SPECIFIC SOURCE PRIORITY
-- Reasonable WAVE 1: fintech/payments/digital-bank companies + exact Business Operations Manager, Business Operations, Strategy & Operations, Operations Manager.
-- Reasonable WAVE 2: same sectors + Product Ops, Payments Ops, Implementation, Customer/Client Ops, Partnerships, Business Manager, Chief of Staff, Transformation/Programme Ops.
-- Reasonable WAVE 3: adjacent high-fit roles at strong fintech/payment/financial-infrastructure employers. Discovery sources may include LinkedIn Jobs, Welcome to the Jungle, Wellfound and current recruiter boards such as Robert Walters, Hays and Michael Page; then cross-check the employer/ATS vacancy.
-- Corporate: bank career pages first; senior operations, transformation, investment/product ops, payments, risk-tech.
-- Fintech: fintech/payments/digital-bank/regtech/wealth-tech company career pages and ATS first; then LinkedIn Jobs, Welcome to the Jungle, Wellfound and specialist/recruiter discovery; verify on official vacancy pages.
-- AI: AI/GenAI product, operations, transformation, governance, implementation.
-- Prestige WAVE 1 — power institutions in Belgium: NATO Careers and NATO bodies/agencies including NCIA/NSPA where relevant; European Defence Agency; EU Careers/EPSO; European Commission; European Parliament; Council/EEAS-related vacancies; EU agencies with Brussels/Belgium roles.
-- Prestige WAVE 2 — defence/diplomatic/international: Belgian/allied defence institutions with civilian vacancies, embassies and diplomatic missions in Belgium, permanent representations, international organisations, security/defence organisations and international programme offices.
-- Prestige WAVE 3 — financial/institutional influence: National Bank of Belgium/central-bank ecosystem, European financial institutions, banking/financial federations, chambers of commerce, major trade associations, regulatory/policy bodies and strategic institutional-relations teams.
-- Prestige WAVE 4 — policy/intellectual influence: respected think tanks, geopolitical/security institutes, public-affairs organisations, policy institutes and international advisory bodies.
-- Prestige WAVE 5 — only if Belgium yields fewer than 6 strong matches: search other EU member states for exceptional English-speaking EU/NATO/defence/international-institution roles where Belgian/EU citizenship makes the candidate clearly eligible.
-- High Paid: senior/executive recruiter + employer pages; high-scope manager/lead/head roles.
-- Turkish: Belgium roles where Turkish/Turkey-market exposure is commercially useful.
-- Creative: boutique/premium/luxury/automotive/yacht/travel/sport/founder-led operational roles.
-- LinkedIn: LinkedIn vacancy pages plus employer cross-check.
-- Global: global career pages + Europe/EMEA remote sources.
-- SW-MO: Swiss/Monaco banks, fintech, tech, luxury, family office, international organisations and specialist recruiters.
+FOCUSED SOURCE PLAN
+${getModeSourcePlan(mode)}
 
 ALREADY SEEN URLS:
 ${seen.length ? seen.join("\n") : "None"}
@@ -382,6 +373,8 @@ FINAL CHECK BEFORE OUTPUT
 - Global: <=30 days and explicit Belgium/EU/Europe/EMEA remote eligibility.
 - SW-MO: <=30 days and realistic Belgian/EU-citizen mobility.
 - PRESTIGE: candidate is Belgian/EU citizen, age 35. Check explicit age/nationality/clearance/status rules. Reject only if a real rule makes the candidate ineligible; Belgian/EU-nationality requirements are acceptable.
+- KAPELLEN: final location must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or a clearly local adjacent northern-Antwerp location named in the mode geography.
+- CREATIVE: reject hands-on trade jobs requiring a craft licence/certificate or deep specialist experience the candidate lacks.
 - ${(mode === "reasonable" || mode === "prestige") ? (mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: aim for 6-10 excellent roles, maximum 10.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
 - Do not output rejected roles or commentary.`;
 }
@@ -446,6 +439,11 @@ function hasRealisticSwmoMobility(job) {
   return false;
 }
 
+function isKapellenArea(job) {
+  const location = String(job?.location || "");
+  return /\b(kapellen|brasschaat|kalmthout|stabroek|schoten|ekeren|hoevenen|mariaburg|merksem|antwerp[- ]north|antwerpen[- ]noord)\b/i.test(location);
+}
+
 function finalizeJobsFromResponse(data, mode = "") {
   const outputText = extractOutputText(data);
   if (!outputText) return [];
@@ -464,6 +462,7 @@ function finalizeJobsFromResponse(data, mode = "") {
     .filter(job => mode !== "linkedin" || isLinkedInJobUrl(job.url))
     .filter(job => mode !== "global" || hasVerifiedEuropeRemote(job))
     .filter(job => mode !== "swmo" || hasRealisticSwmoMobility(job))
+    .filter(job => mode !== "kapellen" || isKapellenArea(job))
     .filter(job => {
       if (mode !== "prestige") return true;
       const age = String(job.ageCheck || "");
