@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.10.0-creative-kapellen-efficiency";
+const APP_VERSION = "3.11.0-dogs-mode";
 
 const MODES = {
   reasonable: {
@@ -22,6 +22,11 @@ const MODES = {
     label: "Creative",
     geography: "Antwerp province first, especially Kapellen/Brasschaat/Schoten/Ekeren/Antwerp; wider Belgium only for an unusually strong creative/renovation fit.",
     focus: "Hands-on, design-led and entrepreneurial roles. Search interior design, renovation, painting/decorating, interior finishing, flooring, microcement/plastering, cabinetry/joinery, carpentry, furniture/workshop/atelier, kitchen/interior fit-out, premium residential renovation, showroom/project operations and technical-commercial interior roles. Include Interior/Renovation Project Manager or Coordinator, Site/Works Coordinator, Operations/Workshop Manager, Project Support, Estimator/Planner, Client/Showroom Project roles and realistic skilled hands-on roles when formal trade credentials are not a hard blocker. Also retain strong-fit premium automotive, yacht/marine, luxury, travel/experience, premium hospitality, sports/leisure, estates, family offices, animal/dog businesses and founder-led companies. Use the candidate's real interior/renovation venture experience, entrepreneurship, customer contact, planning, hands-on problem solving, operational ownership and technology/automation mindset. Prefer roles with visible output, client contact and ownership; reject generic low-skill labour, junior apprenticeships and roles requiring a trade licence/certificate or deep specialist craft experience the candidate clearly lacks."
+  },
+  dogs: {
+    label: "Dogs",
+    geography: "Kapellen and Antwerp region first: Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren, Antwerp and nearby northern Antwerp. Widen to Brussels, Ghent or wider Belgium only for an unusually strong English-speaking pet-sector role or attractive hybrid position.",
+    focus: "Dedicated dogs and animal-sector mode built around the candidate's real Hondinn boutique dog-hotel experience. Search dog hotels, daycare/boarding businesses, premium pet services, pet-tech, pet food and products, animal-health/veterinary groups, pet insurance, pet retail headquarters, distributors and other dog/pet-focused companies. Prioritise roles with meaningful transferable fit: Operations Manager or Coordinator, Customer/Client Operations, Customer Success, Account Management, Partnerships, Business Development, Project/Programme Operations, Service Operations, Business Manager, Implementation, Product/Commercial Operations and other ownership-heavy roles. Hondinn provides direct evidence of dog-care operations, customer communication, scheduling/capacity planning, pricing, service quality, practical problem-solving and entrepreneurship. Combine that with the candidate's banking/operations, stakeholder-management, analytics and technology/automation background where useful. English must be sufficient; Dutch may be optional/preferred but not mandatory. Prefer dynamic roles with responsibility, people/customer contact and growth. Reject generic low-skill kennel/animal-care labour, veterinary-clinician roles, grooming roles requiring specialist qualifications, junior retail-floor jobs and vacancies requiring mandatory professional Dutch/French."
   },
   kapellen: {
     label: "Kapellen",
@@ -201,6 +206,12 @@ const MODE_SOURCE_PLANS = {
     "WAVE 3: premium automotive, yacht/marine, luxury, hospitality/experience, estates, sports/leisure, animal/dog and founder-led businesses only with credible transferable fit.",
     "Use employer sites, VDAB, Jobat, LinkedIn and specialist construction/interior recruiters for discovery; verify the final vacancy directly."
   ],
+  "dogs": [
+    "WAVE 1: dog hotel/daycare/boarding, premium pet-service and dog-care businesses in Kapellen/Antwerp; search operations, coordination, customer and business roles rather than generic animal-care labour.",
+    "WAVE 2: pet food/products, pet-tech, animal-health/veterinary groups, pet insurance, distributors and pet-retail HQ employers in Antwerp/Belgium; prioritise operations, customer success, account management, partnerships, business development and project roles.",
+    "WAVE 3: use employer sites plus LinkedIn Jobs, VDAB, Jobat, Indeed and relevant pet/animal-sector job boards or recruiters for discovery; verify the final role on the employer/ATS page where possible.",
+    "Only widen beyond Antwerp when the role is unusually strong, English-speaking and clearly leverages Hondinn plus the candidate's operations/business background."
+  ],
   "kapellen": [
     "WAVE 1: exact-location searches for Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren across operations/project/business/customer roles.",
     "WAVE 2: local employers/SMEs, banks/financial services, fintech/technology, logistics/port-related employers, premium services and renovation/interior firms; include Hoevenen/Mariaburg/Merksem only when clearly local.",
@@ -251,7 +262,7 @@ function buildPrompt(mode, seenUrls) {
 
   const seen = seenUrls.slice(-50).map(normalizeUrl).filter(Boolean);
   const maxAge = mode === "linkedin" ? 7 : (mode === "global" || mode === "swmo") ? 30 : 60;
-  const target = mode === "prestige" ? 15 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "creative" || mode === "fintech" || mode === "global" || mode === "swmo") ? 9 : 7;
+  const target = mode === "prestige" ? 15 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "creative" || mode === "fintech" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
   const finalTarget = (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
   const stopAt = (mode === "reasonable" || mode === "prestige") ? 10 : 5;
 
@@ -267,7 +278,9 @@ function buildPrompt(mode, seenUrls) {
             ? "KAPELLEN: final location must be in the specified local area. English must be sufficient; Dutch may be optional/preferred but not mandatory."
             : mode === "fintech"
               ? "FINTECH: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure."
-              : "";
+              : mode === "dogs"
+                ? "DOGS: employer/business must genuinely operate in dog/pet/animal services, pet-tech, pet food/products, veterinary/animal health, pet insurance or closely related animal-sector activity. Prioritise Hondinn-relevant operational/commercial roles; reject generic low-skill animal-care jobs."
+                : "";
 
   return `Find CURRENT vacancies using live web search.
 TODAY: ${today}
@@ -290,6 +303,7 @@ SEARCH PLAN
 - Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : "6.5"}.
 - Prestige mode: candidate is Belgian/EU citizen and age 35. Check explicit age, nationality, clearance and status requirements. Do not reject Belgian/EU nationality requirements. Reject age-capped programmes if 35 is outside the allowed range. Output AGE_CHECK with the eligibility conclusion.
 - Creative mode: hands-on trade roles are acceptable only with credible transferable experience; reject mandatory craft licences/certificates or deep specialist experience the candidate lacks.
+- Dogs mode: Hondinn is relevant operating experience. Require a genuine pet/animal-sector employer and favour operations/customer/commercial/project roles that use that experience; do not fill with generic kennel attendants, groomers or veterinary-clinician roles.
 - Fintech mode: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure; ordinary banks qualify only for a clearly fintech/technology venture or product unit.
 - WHY_FIT lines must be short and specific: profile fit; work/scope appeal; career/compensation leverage. Never invent salary.
 
@@ -375,6 +389,7 @@ FINAL CHECK BEFORE OUTPUT
 - PRESTIGE: candidate is Belgian/EU citizen, age 35. Check explicit age/nationality/clearance/status rules. Reject only if a real rule makes the candidate ineligible; Belgian/EU-nationality requirements are acceptable.
 - KAPELLEN: final location must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or a clearly local adjacent northern-Antwerp location named in the mode geography.
 - CREATIVE: reject hands-on trade jobs requiring a craft licence/certificate or deep specialist experience the candidate lacks.
+- DOGS: final employer must be genuinely dog/pet/animal-sector related; English sufficient; reject mandatory professional Dutch/French and low-skill animal-care filler roles.
 - ${(mode === "reasonable" || mode === "prestige") ? (mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: aim for 6-10 excellent roles, maximum 10.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
 - Do not output rejected roles or commentary.`;
 }
