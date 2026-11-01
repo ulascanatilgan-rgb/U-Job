@@ -1,8 +1,8 @@
-const MODES={reasonable:{title:"Reasonable",hint:"Fintech-first Business Operations & Strategy roles — up to 10 verified matches."},creative:{title:"Creative",hint:"Interior, renovation, finishing, workshop and hands-on project roles."},dogs:{title:"Dogs",hint:"Dog, pet and animal-sector roles where Hondinn gives you a real edge."},kapellen:{title:"Kapellen",hint:"Strong-fit jobs close to Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},fintech:{title:"Fintech",hint:"Belgium fintech roles matched to your banking, operations and tech profile."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Power-track institutions, defence, EU/NATO, policy and international influence — up to 10 verified roles."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
-const STORAGE_KEY="ujob:data";let state=loadState();let activeMode=state.activeMode||"reasonable";let activeView=state.activeView||activeMode;const msBusy=new Set();let askBusy=false;const modeStatus={reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
-const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory")};
+const MODES={search:{title:"Search",hint:"Best 10 opportunities across every U-Job theme, ranked together."},reasonable:{title:"Reasonable",hint:"Fintech-first Business Operations & Strategy roles — up to 10 verified matches."},creative:{title:"Creative",hint:"Interior, renovation, finishing, workshop and hands-on project roles."},dogs:{title:"Dogs",hint:"Dog, pet and animal-sector roles where Hondinn gives you a real edge."},kapellen:{title:"Kapellen",hint:"Strong-fit jobs close to Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},startup:{title:"Startup",hint:"High-potential Belgian tech startups and scale-ups, Antwerp first."},fintech:{title:"Fintech",hint:"Belgium fintech roles matched to your banking, operations and tech profile."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Power-track institutions, defence, EU/NATO, policy and international influence — up to 10 verified roles."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
+const STORAGE_KEY="ujob:data";let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;const msBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
+const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory"),primarySearch:$("primarySearch"),primaryDetails:$("primaryDetails"),detailsPanel:$("detailsPanel")};
 function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}
-function emptyState(){return{activeMode:"reasonable",activeView:"reasonable",actions:{},msNotes:{},askHistory:[],reasonable:blankMode(),creative:blankMode(),dogs:blankMode(),kapellen:blankMode(),corporate:blankMode(),fintech:blankMode(),ai:blankMode(),linkedin:blankMode(),global:blankMode(),swmo:blankMode(),prestige:blankMode(),highpaid:blankMode(),turkish:blankMode()}}
+function emptyState(){return{activeMode:"search",activeView:"search",actions:{},msNotes:{},askHistory:[],search:blankMode(),reasonable:blankMode(),creative:blankMode(),dogs:blankMode(),kapellen:blankMode(),corporate:blankMode(),startup:blankMode(),fintech:blankMode(),ai:blankMode(),linkedin:blankMode(),global:blankMode(),swmo:blankMode(),prestige:blankMode(),highpaid:blankMode(),turkish:blankMode()}}
 function mergeRuns(a,b){const seen=new Set();return[...(a||[]),...(b||[])].filter(r=>r&&r.at&&Array.isArray(r.jobs)).sort((x,y)=>new Date(y.at)-new Date(x.at)).filter(r=>{const k=r.at+"|"+r.jobs.map(j=>j.url||j.title||"").join("|");if(seen.has(k))return false;seen.add(k);return true}).slice(0,250)}
 function mergeModeData(a,b){
   a=a||blankMode();b=b||blankMode();
@@ -33,7 +33,7 @@ function mergeState(base,raw){
 function loadState(){let merged=emptyState();try{const stable=localStorage.getItem(STORAGE_KEY);if(stable)merged=mergeState(merged,JSON.parse(stable))}catch{}try{for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||key===STORAGE_KEY||!key.startsWith("ujob:"))continue;try{merged=mergeState(merged,JSON.parse(localStorage.getItem(key)||"{}"))}catch{}}}catch{}try{localStorage.setItem(STORAGE_KEY,JSON.stringify(merged))}catch{}return merged}
 function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}function esc(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}function cleanAskUi(v){return String(v??"").replace(/https?:\/\/\S+/gi,"").replace(/www\.\S+/gi,"").replace(/cite[^]+/g,"").replace(/【[^】]+】/g,"").replace(/\s+/g," ").replace(/\s*[|·•-]\s*$/g,"").trim()}
 function fmtDate(value,withTime=false){if(!value)return"Not run yet";return new Intl.DateTimeFormat("en-BE",withTime?{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}:{day:"2-digit",month:"short",year:"numeric"}).format(new Date(value))}function renderToday(){if(!els.today)return;els.today.textContent=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Brussels",day:"2-digit",month:"long",year:"numeric"}).format(new Date())}
-function seenUrlsForMode(mode){return (state[mode]?.runs||[]).flatMap(run=>run.jobs.map(j=>j.url)).filter(Boolean).slice(-60)}
+function seenUrlsForMode(mode){const runs=mode==="search"?Object.keys(MODES).flatMap(m=>state[m]?.runs||[]):(state[mode]?.runs||[]);return runs.flatMap(run=>run.jobs.map(j=>j.url)).filter(Boolean).slice(-60)}
 function actionKey(job){return String(job?.url||"").trim()}
 function actionCount(){return Object.keys(state.actions||{}).length}
 function findJobByKey(key,preferredMode){
@@ -77,13 +77,24 @@ function bindAppliedControls(root){
     });
   });
 }
+function setDetailsOpen(open){
+  detailsOpen=Boolean(open);
+  if(els.detailsPanel)els.detailsPanel.hidden=!detailsOpen;
+  els.primaryDetails?.classList.toggle("active",detailsOpen||activeMode!=="search");
+  els.primaryDetails?.setAttribute("aria-expanded",String(detailsOpen));
+  els.primarySearch?.classList.toggle("active",activeView==="search");
+}
+function showSearchHome(){
+  setDetailsOpen(false);
+  setMode("search");
+}
 function isModeBusy(mode){return Boolean(state[mode]?.pendingSearch?.id)}
 function syncRunButton(){
   if(activeView==="actions"){els.run.hidden=true;return}
   els.run.hidden=false;
   const busy=isModeBusy(activeMode);
   els.run.disabled=busy;
-  els.run.textContent=busy?"Running…":"Run";
+  els.run.textContent=busy?"Running…":(activeMode==="search"?"Search":"Run");
 }
 function setMode(mode){
   activeMode=mode;
@@ -93,6 +104,10 @@ function setMode(mode){
   document.body.dataset.mode=mode;
   document.querySelectorAll(".mode").forEach(btn=>btn.classList.toggle("active",btn.dataset.mode===mode));
   els.actionsButton?.classList.remove("active");
+  if(mode!=="search")detailsOpen=true;
+  if(els.detailsPanel)els.detailsPanel.hidden=!detailsOpen;
+  els.primarySearch?.classList.toggle("active",mode==="search");
+  els.primaryDetails?.classList.toggle("active",detailsOpen||mode!=="search");
   saveState();
   render();
 }
@@ -102,6 +117,7 @@ function showActions(){
   document.body.dataset.mode="actions";
   document.querySelectorAll(".mode").forEach(btn=>btn.classList.remove("active"));
   els.actionsButton?.classList.add("active");
+  els.primarySearch?.classList.remove("active");
   saveState();
   render();
 }
@@ -121,6 +137,8 @@ function render(){
   if(activeView==="actions"){renderActions();return}
   els.historyWrap.hidden=false;
   els.actionsButton?.classList.remove("active");
+  els.primarySearch?.classList.toggle("active",activeMode==="search");
+  els.primaryDetails?.classList.toggle("active",detailsOpen||activeMode!=="search");
   const meta=MODES[activeMode],modeState=state[activeMode];
   els.title.textContent=meta.title;
   els.hint.textContent=meta.hint;
@@ -343,7 +361,7 @@ function completeModeSearch(mode,data){
   saveState();
   clearPoll(mode);
 
-  const targetMax=(mode==="reasonable"||mode==="prestige")?10:5;
+  const targetMax=(mode==="search"||mode==="reasonable"||mode==="prestige")?10:5;
   modeStatus[mode]=jobs.length===targetMax
     ?String(targetMax)+" verified matches."
     :jobs.length>0
@@ -469,8 +487,10 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=46",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=47",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
+els.primarySearch?.addEventListener("click",showSearchHome);
+els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
 els.actionsButton?.addEventListener("click",showActions);
 els.run.addEventListener("click",runSearch);
 els.historyToggle.addEventListener("click",()=>{const opening=els.history.hidden;els.history.hidden=!opening;els.historyToggle.setAttribute("aria-expanded",String(opening))});
@@ -481,4 +501,6 @@ els.askUrl?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.pre
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&!els.askPanel?.hidden)setAskOpen(false)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")resumePendingSearches()});
 window.addEventListener("focus",resumePendingSearches);
-renderToday();setInterval(renderToday,60000);if(activeView==="actions")showActions();else setMode(activeMode);renderAsk();checkHealth();resumePendingSearches();
+renderToday();setInterval(renderToday,60000);
+activeMode="search";activeView="search";state.activeMode="search";state.activeView="search";saveState();
+setDetailsOpen(false);setMode("search");renderAsk();checkHealth();resumePendingSearches();
