@@ -65,3 +65,5 @@ The app listens on Railway's PORT variable and falls back to port 3000 locally.
 <!-- deploy-trigger: ujob-3.10.0-creative-kapellen-efficiency -->
 
 <!-- deploy-trigger: ujob-3.11.0-dogs-mode -->
+
+<!-- deploy-trigger: ujob-4.0.0-search-details-startup -->
