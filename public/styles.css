@@ -14,8 +14,8 @@ body{
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
   transition:background .22s ease
 }
-body[data-mode="creative"]{--accent:#a66a00;--accent-soft:#fff2d7;--accent-ink:#744900}body[data-mode="dogs"]{--accent:#7a5a3a;--accent-soft:#f2ebe3;--accent-ink:#4b3524}body[data-mode="kapellen"]{--accent:#486b56;--accent-soft:#e8f0eb;--accent-ink:#2d4c39}
-body[data-mode="corporate"]{--accent:#535966;--accent-soft:#eceef1;--accent-ink:#30343b}body[data-mode="fintech"]{--accent:#b4232f;--accent-soft:#f7e7e9;--accent-ink:#17191d}
+body[data-mode="search"]{--accent:#20252d;--accent-soft:#e9edf2;--accent-ink:#15191f}body[data-mode="creative"]{--accent:#a66a00;--accent-soft:#fff2d7;--accent-ink:#744900}body[data-mode="dogs"]{--accent:#7a5a3a;--accent-soft:#f2ebe3;--accent-ink:#4b3524}body[data-mode="kapellen"]{--accent:#486b56;--accent-soft:#e8f0eb;--accent-ink:#2d4c39}
+body[data-mode="corporate"]{--accent:#535966;--accent-soft:#eceef1;--accent-ink:#30343b}body[data-mode="startup"]{--accent:#e05334;--accent-soft:#fceae4;--accent-ink:#8d2f1d}body[data-mode="fintech"]{--accent:#b4232f;--accent-soft:#f7e7e9;--accent-ink:#17191d}
 body[data-mode="ai"]{--accent:#7158d9;--accent-soft:#eeeafd;--accent-ink:#4a37a4}
 body[data-mode="linkedin"]{--accent:#0a66c2;--accent-soft:#e8f2fc;--accent-ink:#064d94}
 body[data-mode="global"]{--accent:#168a86;--accent-soft:#e5f5f3;--accent-ink:#0c625f}
@@ -48,8 +48,27 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
 .today-date{font-size:9px;color:#858991;letter-spacing:.11em;text-transform:uppercase;font-weight:560}
 .last-update{position:absolute;right:1px;top:13px;font-size:9.5px;color:#858991}
 
+.primary-actions{
+  margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:9px;
+}
+.primary-action{
+  min-height:52px;border-radius:17px;border:1px solid rgba(20,21,25,.08);
+  background:rgba(255,255,255,.72);color:#3d424b;font-size:12px;font-weight:710;
+  cursor:pointer;box-shadow:0 10px 26px rgba(24,30,40,.045),inset 0 1px 0 rgba(255,255,255,.82);
+  transition:transform .14s ease,background .16s ease,box-shadow .16s ease,border-color .16s ease
+}
+.primary-action:active{transform:scale(.985)}
+.primary-action.search.active{
+  background:linear-gradient(145deg,#171b21,#2c323b);color:#fff;border-color:rgba(20,24,30,.28);
+  box-shadow:0 10px 25px rgba(20,24,30,.16),inset 0 1px 0 rgba(255,255,255,.11)
+}
+.primary-action.details.active{
+  background:#edf0f4;color:#20252d;border-color:rgba(32,37,45,.16)
+}
+.details-panel{margin-top:9px}
+.details-panel[hidden]{display:none}
 .modes{
-  margin-top:6px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;padding:7px;
+  margin-top:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;padding:7px;
   background:rgba(250,251,252,.64);border:1px solid rgba(20,21,25,.07);border-radius:20px;
   backdrop-filter:blur(22px) saturate(125%);-webkit-backdrop-filter:blur(22px) saturate(125%);
   box-shadow:0 16px 44px rgba(24,30,40,.055),inset 0 1px 0 rgba(255,255,255,.78)
@@ -73,7 +92,7 @@ button{font:inherit;-webkit-tap-highlight-color:transparent}
 }
 .mode.reasonable{--mode-accent:#3867d6;--mode-soft:#e8efff}
 .mode.creative{--mode-accent:#a66a00;--mode-soft:#fff1d2}.mode.dogs{--mode-accent:#7a5a3a;--mode-soft:#f1e9e0}.mode.kapellen{--mode-accent:#486b56;--mode-soft:#e7efe9}
-.mode.corporate{--mode-accent:#515761;--mode-soft:#eceef1}.mode.fintech{--mode-accent:#b4232f;--mode-soft:#eee7e9}
+.mode.corporate{--mode-accent:#515761;--mode-soft:#eceef1}.mode.startup{--mode-accent:#e05334;--mode-soft:#fbe9e3}.mode.fintech{--mode-accent:#b4232f;--mode-soft:#eee7e9}
 .mode.ai{--mode-accent:#7158d9;--mode-soft:#eeeafd}
 .mode.linkedin{--mode-accent:#0a66c2;--mode-soft:#e5f1fc}
 .mode.global{--mode-accent:#168a86;--mode-soft:#e3f4f2}
@@ -301,4 +320,9 @@ h1{margin:0 0 7px;font-size:29px;line-height:1;font-weight:680;letter-spacing:-.
 }
 @media(max-width:520px){
   .ask-inline{flex-basis:50px!important;width:50px!important;height:50px!important}
+}
+
+body[data-mode="search"] .run{
+  background:linear-gradient(145deg,#171b21,#303741);
+  box-shadow:0 8px 20px rgba(20,24,30,.18),inset 0 1px 0 rgba(255,255,255,.12)
 }
