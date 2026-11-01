@@ -8,12 +8,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="U-Job">
   <title>U-Job</title>
-  <link rel="manifest" href="/manifest.webmanifest?v=46">
-  <link rel="icon" href="/icon.svg?v=46" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/icon.svg?v=46">
-  <link rel="stylesheet" href="/styles.css?v=46">
+  <link rel="manifest" href="/manifest.webmanifest?v=47">
+  <link rel="icon" href="/icon.svg?v=47" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg?v=47">
+  <link rel="stylesheet" href="/styles.css?v=47">
 </head>
-<body data-mode="reasonable">
+<body data-mode="search">
   <main class="shell">
     <header class="topbar">
       <div class="brand-center">
@@ -25,21 +25,28 @@
       </div>
       <div id="lastUpdate" class="last-update"></div>
     </header>
-    <nav class="modes" aria-label="Job search modes">
-      <button class="mode reasonable active" data-mode="reasonable">Reasonable</button>
-      <button class="mode creative" data-mode="creative">Creative</button>
-      <button class="mode dogs" data-mode="dogs">Dogs</button>
-      <button class="mode kapellen" data-mode="kapellen">Kapellen</button>
-      <button class="mode corporate" data-mode="corporate">Corporate</button>
-      <button class="mode fintech" data-mode="fintech">Fintech</button>
-      <button class="mode ai" data-mode="ai">AI</button>
-      <button class="mode linkedin" data-mode="linkedin">LinkedIn</button>
-      <button class="mode global" data-mode="global">Global</button>
-      <button class="mode swmo" data-mode="swmo">SW-MO</button>
-      <button class="mode prestige" data-mode="prestige">Prestige</button>
-      <button class="mode highpaid" data-mode="highpaid">High Paid</button>
-      <button class="mode turkish" data-mode="turkish">Turkish</button>
-    </nav>
+    <div class="primary-actions" aria-label="Main U-Job functions">
+      <button id="primarySearch" class="primary-action search active" type="button">Search</button>
+      <button id="primaryDetails" class="primary-action details" type="button" aria-controls="detailsPanel" aria-expanded="false">Details</button>
+    </div>
+    <section id="detailsPanel" class="details-panel" hidden>
+      <nav class="modes" aria-label="Detailed job search modes">
+        <button class="mode reasonable" data-mode="reasonable">Reasonable</button>
+        <button class="mode startup" data-mode="startup">Startup</button>
+        <button class="mode fintech" data-mode="fintech">Fintech</button>
+        <button class="mode corporate" data-mode="corporate">Corporate</button>
+        <button class="mode ai" data-mode="ai">AI</button>
+        <button class="mode prestige" data-mode="prestige">Prestige</button>
+        <button class="mode highpaid" data-mode="highpaid">High Paid</button>
+        <button class="mode linkedin" data-mode="linkedin">LinkedIn</button>
+        <button class="mode global" data-mode="global">Global</button>
+        <button class="mode swmo" data-mode="swmo">SW-MO</button>
+        <button class="mode kapellen" data-mode="kapellen">Kapellen</button>
+        <button class="mode creative" data-mode="creative">Creative</button>
+        <button class="mode dogs" data-mode="dogs">Dogs</button>
+        <button class="mode turkish" data-mode="turkish">Turkish</button>
+      </nav>
+    </section>
     <div class="utility-row">
       <button id="actionsMode" class="actions-mode" type="button">
         <span>Watchlist</span><span id="actionsCount">0</span>
@@ -48,10 +55,10 @@
     </div>
     <section class="control-row">
       <div>
-        <h1 id="sectionTitle">Reasonable</h1>
-        <p id="sectionHint">Balanced, dynamic next step.</p>
+        <h1 id="sectionTitle">Search</h1>
+        <p id="sectionHint">Best 10 opportunities across every U-Job theme, ranked together.</p>
       </div>
-      <button id="runButton" class="run">Run</button>
+      <button id="runButton" class="run">Search</button>
     </section>
     <div id="status" class="status" aria-live="polite"></div>
     <section id="results" class="results"></section>
@@ -86,6 +93,6 @@
       caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key)))).catch(() => {});
     }
   </script>
-  <script type="module" src="/app.js?v=46"></script>
+  <script type="module" src="/app.js?v=47"></script>
 </body>
 </html>
