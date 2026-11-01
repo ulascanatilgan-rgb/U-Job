@@ -10,9 +10,14 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "3.11.0-dogs-mode";
+const APP_VERSION = "4.0.0-search-details-startup";
 
 const MODES = {
+  search: {
+    label: "Search",
+    geography: "Belgium first, prioritising Antwerp/Kapellen, Brussels and Ghent. Include strong hybrid Belgium roles. Also allow exceptional EU-institutional, Europe/EMEA remote, Switzerland/Monaco or other international roles only when they clearly outperform Belgian options on fit, prestige, compensation or career leverage.",
+    focus: "Master search across every U-Job theme. Find the ten strongest current vacancies for this candidate across fintech/business operations, startups, banking/corporate, AI/technology, prestige/EU/NATO/international institutions, high-paid strategic roles, local Kapellen/Antwerp opportunities, creative/interior/renovation work, dog/pet-sector roles, Turkish-market roles and exceptional global/SW-MO opportunities. Rank by realistic candidacy first, then role quality, ownership, international exposure, compensation/career upside, enjoyment and future optionality. Prefer English-speaking roles and reject mandatory professional Dutch/French, junior/repetitive work and major must-have gaps."
+  },
   reasonable: {
     label: "Reasonable",
     geography: "Belgium, with Antwerp/Kapellen/Brasschaat and Brussels first; Mechelen/Ghent/Leuven next. Hybrid roles are welcome.",
@@ -37,6 +42,11 @@ const MODES = {
     label: "Corporate",
     geography: "Antwerp and Brussels first; then Ghent, Leuven and wider Belgium for strong banking roles.",
     focus: "Banking-sector focused roles that make strong use of the candidate's 12+ years across banking, internal audit, fraud, internal control, IAM/access operations, IT risk/security and fintech. Search banks and banking groups intensively before adjacent sectors: Belgian banks, international banks with Belgian offices, digital banks, private banks, investment banks, custody/securities institutions and bank-owned technology or transformation teams. Prioritise senior operations, business management, transformation, programme/project leadership, investment/product operations, payments, financial-crime technology, security governance, controls, risk-tech and strategic operations. Prefer roles with management exposure, cross-functional ownership and compensation/career progression. Avoid junior roles, narrow back-office IAM work and positions fundamentally dependent on mandatory Dutch/French."
+  },
+  startup: {
+    label: "Startup",
+    geography: "Belgium only, with Antwerp first, then Brussels and Ghent; include Leuven/Mechelen only for unusually strong fit. Hybrid Belgium-based roles are welcome.",
+    focus: "High-potential modern-technology startups and scale-ups with real growth signals, differentiated technology or a strong digital product. Prioritise companies in AI, fintech/payments, cybersecurity, SaaS, data/infrastructure, robotics, climate/energy tech, space/deep-tech, mobility, biotech/health-tech and other future-facing sectors. Search roles where the candidate can genuinely compete: Business Operations, Strategy & Operations, Operations Manager, Chief of Staff, Business Manager, Customer Success/Client Operations, Implementation, Partnerships, Product Operations, Programme/Project Operations, Commercial Operations, Transformation and founder/executive right-hand roles. Prefer English-speaking international teams, visible ownership, direct founder/leadership exposure, meaningful responsibility, fast learning and credible career/equity upside. Use the candidate's banking/fintech, operations, stakeholder management, controls/security, analytics, entrepreneurship and hands-on AI/web-app building as strengths. Reject pre-revenue hobby projects with no hiring substance, junior roles, pure coding/research roles with major gaps, generic sales-only roles and mandatory professional Dutch/French."
   },
   fintech: {
     label: "Fintech",
@@ -195,6 +205,15 @@ function cleanJob(job) {
 }
 
 const MODE_SOURCE_PLANS = {
+  "search": [
+    "WAVE 1 — strongest realistic career moves: fintech/startup/business operations, Strategy & Operations, Chief of Staff, Business Manager, Product/Customer Ops, implementation and transformation across Antwerp/Brussels/Ghent.",
+    "WAVE 2 — premium corporate/financial/AI: banks, fintech/payments, AI/technology, cybersecurity, investment/product operations and high-paid strategic roles.",
+    "WAVE 3 — prestige/power track: EU/NATO/EDA/Commission/Parliament/international institutions, policy/security/governance and internationally prestigious employers.",
+    "WAVE 4 — local/entrepreneurial fit: Kapellen/Antwerp local roles, interior/renovation/creative operations and dog/pet-sector roles where direct entrepreneurial experience creates an edge.",
+    "WAVE 5 — optionality: Turkish-market roles plus exceptional Europe/EMEA remote, Switzerland/Monaco or other international roles only if clearly stronger than ordinary Belgian alternatives.",
+    "Use official employer/ATS pages first where practical; LinkedIn, Welcome to the Jungle, Wellfound, VDAB, Jobat and strong recruiters for discovery. Do not impose category quotas: return the overall best ten by fit and quality."
+  ],
+
   "reasonable": [
     "WAVE 1: fintech/payments/digital-bank employers + Business Operations, Strategy & Operations, Operations Manager.",
     "WAVE 2: Product Ops, Payments Ops, Implementation, Customer/Client Ops, Partnerships, Business Manager, Chief of Staff, Transformation/Programme Ops in the same sectors.",
@@ -211,6 +230,12 @@ const MODE_SOURCE_PLANS = {
     "WAVE 2: pet food/products, pet-tech, animal-health/veterinary groups, pet insurance, distributors and pet-retail HQ employers in Antwerp/Belgium; prioritise operations, customer success, account management, partnerships, business development and project roles.",
     "WAVE 3: use employer sites plus LinkedIn Jobs, VDAB, Jobat, Indeed and relevant pet/animal-sector job boards or recruiters for discovery; verify the final role on the employer/ATS page where possible.",
     "Only widen beyond Antwerp when the role is unusually strong, English-speaking and clearly leverages Hondinn plus the candidate's operations/business background."
+  ],
+  "startup": [
+    "WAVE 1: Antwerp startups/scale-ups with modern technology; search company career pages, Start it @KBC ecosystem/company lists, accelerator/VC portfolio companies and current startup job boards for Business/Strategy/Operations, Chief of Staff, Customer Success, Implementation and Partnerships roles.",
+    "WAVE 2: Brussels and Ghent high-growth startups/scale-ups in AI, fintech, SaaS, cyber, data, robotics, climate/energy, mobility, deep-tech and health-tech; favour English-speaking international teams.",
+    "WAVE 3: use Wellfound, LinkedIn Jobs, Welcome to the Jungle, Belgian startup/VC ecosystems and specialist recruiters for discovery, then verify the exact role on employer/ATS pages.",
+    "Prioritise credible growth signals: active hiring, funded/scale-up stage, real customers/market traction or strong institutional/VC backing. Do not invent funding or growth claims."
   ],
   "kapellen": [
     "WAVE 1: exact-location searches for Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren across operations/project/business/customer roles.",
@@ -262,7 +287,7 @@ function buildPrompt(mode, seenUrls) {
 
   const seen = seenUrls.slice(-50).map(normalizeUrl).filter(Boolean);
   const maxAge = mode === "linkedin" ? 7 : (mode === "global" || mode === "swmo") ? 30 : 60;
-  const target = mode === "prestige" ? 15 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "creative" || mode === "fintech" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
+  const target = mode === "search" ? 20 : mode === "prestige" ? 15 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "creative" || mode === "fintech" || mode === "startup" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
   const finalTarget = (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
   const stopAt = (mode === "reasonable" || mode === "prestige") ? 10 : 5;
 
@@ -280,7 +305,11 @@ function buildPrompt(mode, seenUrls) {
               ? "FINTECH: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure."
               : mode === "dogs"
                 ? "DOGS: employer/business must genuinely operate in dog/pet/animal services, pet-tech, pet food/products, veterinary/animal health, pet insurance or closely related animal-sector activity. Prioritise Hondinn-relevant operational/commercial roles; reject generic low-skill animal-care jobs."
-                : "";
+                : mode === "startup"
+                  ? "STARTUP: employer must be a genuine startup/scale-up or modern high-growth technology company with current hiring substance. English must be sufficient."
+                  : mode === "search"
+                    ? "SEARCH: this is the master ranking across every U-Job theme. Do not force category diversity or quotas; return the ten strongest roles overall."
+                    : "";
 
   return `Find CURRENT vacancies using live web search.
 TODAY: ${today}
@@ -304,6 +333,8 @@ SEARCH PLAN
 - Prestige mode: candidate is Belgian/EU citizen and age 35. Check explicit age, nationality, clearance and status requirements. Do not reject Belgian/EU nationality requirements. Reject age-capped programmes if 35 is outside the allowed range. Output AGE_CHECK with the eligibility conclusion.
 - Creative mode: hands-on trade roles are acceptable only with credible transferable experience; reject mandatory craft licences/certificates or deep specialist experience the candidate lacks.
 - Dogs mode: Hondinn is relevant operating experience. Require a genuine pet/animal-sector employer and favour operations/customer/commercial/project roles that use that experience; do not fill with generic kennel attendants, groomers or veterinary-clinician roles.
+- Startup mode: require a genuine modern-technology startup/scale-up with credible hiring substance; favour roles with ownership and leadership exposure. Do not invent funding, runway, valuation or growth claims.
+- Search mode: evaluate all categories on one common score and return the overall top ten, not ten per category.
 - Fintech mode: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure; ordinary banks qualify only for a clearly fintech/technology venture or product unit.
 - WHY_FIT lines must be short and specific: profile fit; work/scope appeal; career/compensation leverage. Never invent salary.
 
@@ -390,7 +421,7 @@ FINAL CHECK BEFORE OUTPUT
 - KAPELLEN: final location must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or a clearly local adjacent northern-Antwerp location named in the mode geography.
 - CREATIVE: reject hands-on trade jobs requiring a craft licence/certificate or deep specialist experience the candidate lacks.
 - DOGS: final employer must be genuinely dog/pet/animal-sector related; English sufficient; reject mandatory professional Dutch/French and low-skill animal-care filler roles.
-- ${(mode === "reasonable" || mode === "prestige") ? (mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: aim for 6-10 excellent roles, maximum 10.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
+- ${(mode === "search" || mode === "reasonable" || mode === "prestige") ? (mode === "search" ? "Search: rank all themes together and return up to 10 excellent roles." : mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: aim for 6-10 excellent roles, maximum 10.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
 - Do not output rejected roles or commentary.`;
 }
 
@@ -500,7 +531,7 @@ function finalizeJobsFromResponse(data, mode = "") {
       return true;
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, (mode === "reasonable" || mode === "prestige") ? 10 : 5);
+    .slice(0, (mode === "search" || mode === "reasonable" || mode === "prestige") ? 10 : 5);
 }
 
 
@@ -890,7 +921,7 @@ async function startSearch(req, res) {
         }],
         tool_choice: "required",
         input: strictPrompt,
-        max_output_tokens: mode === "prestige" ? 3900 : mode === "reasonable" ? 3600 : 3200
+        max_output_tokens: mode === "search" ? 4000 : mode === "prestige" ? 3900 : mode === "reasonable" ? 3600 : 3200
       })
     });
 
