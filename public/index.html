@@ -8,10 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="U-Job">
   <title>U-Job</title>
-  <link rel="manifest" href="/manifest.webmanifest?v=49">
-  <link rel="icon" href="/icon.svg?v=49" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="/icon.svg?v=49">
-  <link rel="stylesheet" href="/styles.css?v=49">
+  <link rel="manifest" href="/manifest.webmanifest?v=50">
+  <link rel="icon" href="/icon.svg?v=50" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg?v=50">
+  <link rel="stylesheet" href="/styles.css?v=50">
 </head>
 <body data-mode="search">
   <main class="shell">
@@ -34,6 +34,7 @@
         <button class="mode reasonable" data-mode="reasonable">Reasonable</button>
         <button class="mode startup" data-mode="startup">Startup</button>
         <button class="mode familyoffice" data-mode="familyoffice">Family O.</button>
+        <button class="mode investment" data-mode="investment">Investment</button>
         <button class="mode fintech" data-mode="fintech">Fintech</button>
         <button class="mode corporate" data-mode="corporate">Corporate</button>
         <button class="mode ai" data-mode="ai">AI</button>
@@ -57,7 +58,7 @@
     <section class="control-row">
       <div>
         <h1 id="sectionTitle">Search</h1>
-        <p id="sectionHint">Best 10 opportunities across every U-Job theme, ranked together.</p>
+        <p id="sectionHint">Best 12 opportunities across every U-Job theme, ranked together.</p>
       </div>
       <button id="runButton" class="run">Search</button>
     </section>
@@ -94,6 +95,6 @@
       caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key)))).catch(() => {});
     }
   </script>
-  <script type="module" src="/app.js?v=49"></script>
+  <script type="module" src="/app.js?v=50"></script>
 </body>
 </html>
