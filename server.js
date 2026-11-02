@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.0.0-search-details-startup";
+const APP_VERSION = "4.1.0-family-office-cv";
 
 const MODES = {
   search: {
@@ -42,6 +42,11 @@ const MODES = {
     label: "Corporate",
     geography: "Antwerp and Brussels first; then Ghent, Leuven and wider Belgium for strong banking roles.",
     focus: "Banking-sector focused roles that make strong use of the candidate's 12+ years across banking, internal audit, fraud, internal control, IAM/access operations, IT risk/security and fintech. Search banks and banking groups intensively before adjacent sectors: Belgian banks, international banks with Belgian offices, digital banks, private banks, investment banks, custody/securities institutions and bank-owned technology or transformation teams. Prioritise senior operations, business management, transformation, programme/project leadership, investment/product operations, payments, financial-crime technology, security governance, controls, risk-tech and strategic operations. Prefer roles with management exposure, cross-functional ownership and compensation/career progression. Avoid junior roles, narrow back-office IAM work and positions fundamentally dependent on mandatory Dutch/French."
+  },
+  familyoffice: {
+    label: "Family O.",
+    geography: "Belgium first, especially Antwerp and Brussels; Ghent and wider Belgium for unusually strong fit. English-speaking or genuinely international environments are preferred.",
+    focus: "Family offices, multi-family offices, family-owned investment holdings, entrepreneurial family groups, private investment offices, family capital/wealth-management boutiques, owner/founder offices and small management teams around wealthy families or family-controlled companies. Prioritise roles where the candidate can show breadth and ownership rather than requiring an established private-banking sales book: Business/Operations Manager, Family Office Operations, Fund/Investment Operations, Portfolio/Reporting Operations, Chief of Staff, Executive/Owner Office, Strategic Projects, Governance, Risk/Control, Technology/Transformation, Client/Family Coordination, Partnerships and right-hand roles. Also search family-owned operating companies where the family/owners remain close to management and a broad operator can have visible impact. Use banking/fintech, controls/audit, stakeholder management, numbers/reporting, technology, entrepreneurship and international experience as strengths. Avoid pure tax/legal estate-planning roles, private-banker roles requiring an existing HNW client book, specialist portfolio-manager roles without transferable fit, and mandatory professional Dutch/French."
   },
   startup: {
     label: "Startup",
@@ -207,7 +212,7 @@ function cleanJob(job) {
 const MODE_SOURCE_PLANS = {
   "search": [
     "WAVE 1 — strongest realistic career moves: fintech/startup/business operations, Strategy & Operations, Chief of Staff, Business Manager, Product/Customer Ops, implementation and transformation across Antwerp/Brussels/Ghent.",
-    "WAVE 2 — premium corporate/financial/AI: banks, fintech/payments, AI/technology, cybersecurity, investment/product operations and high-paid strategic roles.",
+    "WAVE 2 — premium corporate/financial/AI: banks, fintech/payments, family offices/family capital, AI/technology, cybersecurity, investment/product operations and high-paid strategic roles.",
     "WAVE 3 — prestige/power track: EU/NATO/EDA/Commission/Parliament/international institutions, policy/security/governance and internationally prestigious employers.",
     "WAVE 4 — local/entrepreneurial fit: Kapellen/Antwerp local roles, interior/renovation/creative operations and dog/pet-sector roles where direct entrepreneurial experience creates an edge.",
     "WAVE 5 — optionality: Turkish-market roles plus exceptional Europe/EMEA remote, Switzerland/Monaco or other international roles only if clearly stronger than ordinary Belgian alternatives.",
@@ -230,6 +235,13 @@ const MODE_SOURCE_PLANS = {
     "WAVE 2: pet food/products, pet-tech, animal-health/veterinary groups, pet insurance, distributors and pet-retail HQ employers in Antwerp/Belgium; prioritise operations, customer success, account management, partnerships, business development and project roles.",
     "WAVE 3: use employer sites plus LinkedIn Jobs, VDAB, Jobat, Indeed and relevant pet/animal-sector job boards or recruiters for discovery; verify the final role on the employer/ATS page where possible.",
     "Only widen beyond Antwerp when the role is unusually strong, English-speaking and clearly leverages Hondinn plus the candidate's operations/business background."
+  ],
+  "familyoffice": [
+    "WAVE 1: direct family-office and multi-family-office career pages in Belgium plus private investment/wealth boutiques; target operations, reporting, governance, fund/investment operations, strategic projects, family/client coordination and business-management roles.",
+    "WAVE 2: boutique executive-search and specialist recruiters such as Morgan Philips, Sander and similar private-wealth/family-office recruiters; include confidential/off-market searches when a real vacancy page exists.",
+    "WAVE 3: family-owned investment holdings, entrepreneurial family groups and portfolio-company ecosystems; search owner office, investment office, chief of staff, business manager, strategic projects and portfolio operations roles.",
+    "WAVE 4: Antwerp/Belgium private banks or investment houses with genuine family-owned/boutique culture only when the role offers broad ownership rather than a mandatory existing client book.",
+    "Use official pages and direct recruiter vacancy pages; hidden-gem discovery may include portfolio-company pages, spontaneous-opportunity pages and specialist executive-search listings, but never invent an opening."
   ],
   "startup": [
     "WAVE 1: Antwerp startups/scale-ups with modern technology; search company career pages, Start it @KBC ecosystem/company lists, accelerator/VC portfolio companies and current startup job boards for Business/Strategy/Operations, Chief of Staff, Customer Success, Implementation and Partnerships roles.",
@@ -287,7 +299,7 @@ function buildPrompt(mode, seenUrls) {
 
   const seen = seenUrls.slice(-50).map(normalizeUrl).filter(Boolean);
   const maxAge = mode === "linkedin" ? 7 : (mode === "global" || mode === "swmo") ? 30 : 60;
-  const target = mode === "search" ? 20 : mode === "prestige" ? 15 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "creative" || mode === "fintech" || mode === "startup" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
+  const target = mode === "search" ? 20 : mode === "prestige" ? 15 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "creative" || mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
   const finalTarget = (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
   const stopAt = (mode === "reasonable" || mode === "prestige") ? 10 : 5;
 
@@ -307,7 +319,9 @@ function buildPrompt(mode, seenUrls) {
                 ? "DOGS: employer/business must genuinely operate in dog/pet/animal services, pet-tech, pet food/products, veterinary/animal health, pet insurance or closely related animal-sector activity. Prioritise Hondinn-relevant operational/commercial roles; reject generic low-skill animal-care jobs."
                 : mode === "startup"
                   ? "STARTUP: employer must be a genuine startup/scale-up or modern high-growth technology company with current hiring substance. English must be sufficient."
-                  : mode === "search"
+                  : mode === "familyoffice"
+                    ? "FAMILY O.: employer must genuinely be a family office, multi-family office, family investment/holding structure, owner office, wealth/investment boutique or family-controlled group. Reject roles whose core requirement is tax-law expertise, a pre-existing HNW sales book or specialist discretionary portfolio management."
+                    : mode === "search"
                     ? "SEARCH: this is the master ranking across every U-Job theme. Do not force category diversity or quotas; return the ten strongest roles overall."
                     : "";
 
@@ -323,6 +337,9 @@ SEARCH PLAN
 - Discover about ${target} serious candidates, then return the best ${finalTarget}. Stop once ${stopAt} strong verified roles are found.
 - Use ONLY the focused source plan below. Start each wave with one broad discovery query, then targeted verification. Avoid equivalent/repeated queries and do not re-search the same domain without a reason.
 - Prefer official employer/institution and direct ATS pages. Use job boards/recruiters mainly for discovery, then verify the final vacancy directly whenever possible.
+- Hidden-gem layer: also inspect niche sector boards, boutique/executive recruiters, VC/PE or holding portfolio-company career pages, chambers/associations, accelerator ecosystems, local employer career pages and credible spontaneous-opportunity pages when relevant to the selected mode.
+- Search role synonyms and employer ecosystems, not only exact job titles. Example: Business Operations may appear as Business Manager, Strategic Projects, Portfolio Operations, Founder/Owner Office, Programme Operations or Chief of Staff.
+- Broad aggregators are gap-fillers, not the primary evidence source. Final results should favour direct employer/ATS or identifiable recruiter vacancy pages.
 - Drop obvious location/language/seniority/skill mismatches early instead of spending web calls on them.
 - If fewer than 3 valid roles remain, complete the relevant waves before returning. Reasonable/Prestige may continue until 10 strong verified roles.
 - Freshness: prefer <=7 days, then <=14, then <=30; max age ${maxAge} days. LinkedIn never exceeds 7 days.
@@ -334,6 +351,7 @@ SEARCH PLAN
 - Creative mode: hands-on trade roles are acceptable only with credible transferable experience; reject mandatory craft licences/certificates or deep specialist experience the candidate lacks.
 - Dogs mode: Hondinn is relevant operating experience. Require a genuine pet/animal-sector employer and favour operations/customer/commercial/project roles that use that experience; do not fill with generic kennel attendants, groomers or veterinary-clinician roles.
 - Startup mode: require a genuine modern-technology startup/scale-up with credible hiring substance; favour roles with ownership and leadership exposure. Do not invent funding, runway, valuation or growth claims.
+- Family O. mode: favour broad operator/right-hand/investment-operations/governance roles where banking, controls, reporting, stakeholder and entrepreneurial experience transfer directly. Reject pure estate-tax-law, client-book-dependent private banking and specialist portfolio-management roles.
 - Search mode: evaluate all categories on one common score and return the overall top ten, not ten per category.
 - Fintech mode: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure; ordinary banks qualify only for a clearly fintech/technology venture or product unit.
 - WHY_FIT lines must be short and specific: profile fit; work/scope appeal; career/compensation leverage. Never invent salary.
