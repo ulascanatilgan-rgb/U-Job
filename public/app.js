@@ -1,8 +1,8 @@
-const MODES={search:{title:"Search",hint:"Best 10 opportunities across every U-Job theme, ranked together."},reasonable:{title:"Reasonable",hint:"Fintech-first Business Operations & Strategy roles — up to 10 verified matches."},creative:{title:"Creative",hint:"Interior, renovation, finishing, workshop and hands-on project roles."},dogs:{title:"Dogs",hint:"Dog, pet and animal-sector roles where Hondinn gives you a real edge."},kapellen:{title:"Kapellen",hint:"Strong-fit jobs close to Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},startup:{title:"Startup",hint:"High-potential Belgian tech startups and scale-ups, Antwerp first."},fintech:{title:"Fintech",hint:"Belgium fintech roles matched to your banking, operations and tech profile."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Power-track institutions, defence, EU/NATO, policy and international influence — up to 10 verified roles."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
-const STORAGE_KEY="ujob:data";let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;const msBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
+const MODES={search:{title:"Search",hint:"Best 10 opportunities across every U-Job theme, ranked together."},reasonable:{title:"Reasonable",hint:"Fintech-first Business Operations & Strategy roles — up to 10 verified matches."},creative:{title:"Creative",hint:"Interior, renovation, finishing, workshop and hands-on project roles."},dogs:{title:"Dogs",hint:"Dog, pet and animal-sector roles where Hondinn gives you a real edge."},kapellen:{title:"Kapellen",hint:"Strong-fit jobs close to Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},startup:{title:"Startup",hint:"High-potential Belgian tech startups and scale-ups, Antwerp first."},familyoffice:{title:"Family O.",hint:"Family offices, family capital, owner offices and boutique investment/operations roles."},fintech:{title:"Fintech",hint:"Belgium fintech roles matched to your banking, operations and tech profile."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Power-track institutions, defence, EU/NATO, policy and international influence — up to 10 verified roles."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
+const STORAGE_KEY="ujob:data";let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;const msBusy=new Set();const cvBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",familyoffice:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,familyoffice:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
 const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory"),primarySearch:$("primarySearch"),primaryDetails:$("primaryDetails"),detailsPanel:$("detailsPanel")};
 function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}
-function emptyState(){return{activeMode:"search",activeView:"search",actions:{},msNotes:{},askHistory:[],search:blankMode(),reasonable:blankMode(),creative:blankMode(),dogs:blankMode(),kapellen:blankMode(),corporate:blankMode(),startup:blankMode(),fintech:blankMode(),ai:blankMode(),linkedin:blankMode(),global:blankMode(),swmo:blankMode(),prestige:blankMode(),highpaid:blankMode(),turkish:blankMode()}}
+function emptyState(){return{activeMode:"search",activeView:"search",actions:{},msNotes:{},askHistory:[],search:blankMode(),reasonable:blankMode(),creative:blankMode(),dogs:blankMode(),kapellen:blankMode(),corporate:blankMode(),startup:blankMode(),familyoffice:blankMode(),fintech:blankMode(),ai:blankMode(),linkedin:blankMode(),global:blankMode(),swmo:blankMode(),prestige:blankMode(),highpaid:blankMode(),turkish:blankMode()}}
 function mergeRuns(a,b){const seen=new Set();return[...(a||[]),...(b||[])].filter(r=>r&&r.at&&Array.isArray(r.jobs)).sort((x,y)=>new Date(y.at)-new Date(x.at)).filter(r=>{const k=r.at+"|"+r.jobs.map(j=>j.url||j.title||"").join("|");if(seen.has(k))return false;seen.add(k);return true}).slice(0,250)}
 function mergeModeData(a,b){
   a=a||blankMode();b=b||blankMode();
@@ -171,6 +171,46 @@ function msFilename(job){
   const slug=[job.company,job.title].filter(Boolean).join("_").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,90);
   return "Ulas_Atilgan_"+(slug||"Motivation_Statement")+"_MSVersion1.pdf";
 }
+function cvFilename(job){
+  const slug=[job.company,job.title].filter(Boolean).join("_").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,90);
+  return "Ulas_Atilgan_"+(slug||"Tailored")+"_CV.pdf";
+}
+async function updateCv(key,button){
+  const job=state.actions?.[key];
+  if(!job||cvBusy.has(key))return;
+  const card=button.closest(".action-job");
+  const noteEl=card?.querySelector("textarea[data-ms-note-key]");
+  const statusEl=card?.querySelector("[data-ms-status]");
+  const note=noteEl?.value||state.msNotes?.[key]||"";
+  if(!state.msNotes)state.msNotes={};
+  state.msNotes[key]=note;saveState();
+
+  cvBusy.add(key);button.disabled=true;button.textContent="Updating CV…";
+  if(statusEl)statusEl.textContent="Reading the vacancy and tailoring your one-page CV…";
+  let preview=null;try{preview=window.open("","_blank")}catch{}
+  try{
+    const response=await apiFetch("/api/cv/generate",{
+      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({job,note})
+    },90000);
+    if(!response.ok){
+      const data=await response.json().catch(()=>({}));
+      throw new Error(data.error||"Could not generate tailored CV.");
+    }
+    const blob=await response.blob();
+    if(blob.type!=="application/pdf")throw new Error("The server did not return a PDF.");
+    const blobUrl=URL.createObjectURL(blob);
+    if(preview){preview.location.href=blobUrl}else{
+      const a=document.createElement("a");a.href=blobUrl;a.download=cvFilename(job);document.body.appendChild(a);a.click();a.remove();
+    }
+    if(statusEl)statusEl.textContent="Tailored CV ready.";
+    setTimeout(()=>URL.revokeObjectURL(blobUrl),120000);
+  }catch(error){
+    try{preview?.close()}catch{}
+    if(statusEl)statusEl.textContent=error?.name==="AbortError"?"CV generation took too long. Try again.":(error.message||"Could not generate tailored CV.");
+  }finally{
+    cvBusy.delete(key);button.disabled=false;button.textContent="Update CV";
+  }
+}
 async function generateMs(key,button){
   const job=state.actions?.[key];
   if(!job||msBusy.has(key))return;
@@ -231,6 +271,9 @@ function bindMsControls(root){
   root.querySelectorAll("button[data-generate-ms]").forEach(button=>{
     button.addEventListener("click",()=>generateMs(button.dataset.generateMs,button));
   });
+  root.querySelectorAll("button[data-update-cv]").forEach(button=>{
+    button.addEventListener("click",()=>updateCv(button.dataset.updateCv,button));
+  });
 }
 function addAskToWatchlist(job){
   const key=actionKey(job);if(!key)return;
@@ -290,12 +333,12 @@ function renderActionResults(jobs){
   els.results.innerHTML=jobs.map(job=>{
     const key=actionKey(job);
     const note=state.msNotes?.[key]||"";
-    const busy=msBusy.has(key);
+    const busy=msBusy.has(key),cvBusyNow=cvBusy.has(key);
     return `<article class="job action-job action-compact">
       <h2 class="job-title"><a class="action-title-link" href="${esc(job.url)}" target="_blank" rel="noopener noreferrer">${esc(job.title)}</a></h2>
       <div class="job-meta">${esc(job.company)} · ${esc(job.location)}${job.publishedDate?` · Published ${esc(job.publishedDate)}`:""}</div>
       <div class="ms-tools">
-        <button class="generate-ms" type="button" data-generate-ms="${esc(key)}"${busy?" disabled":""}>${busy?"Generating PDF…":"Generate MS"}</button>
+        <div class="doc-buttons"><button class="generate-ms" type="button" data-generate-ms="${esc(key)}"${busy?" disabled":""}>${busy?"Generating PDF…":"Generate MS"}</button><button class="update-cv" type="button" data-update-cv="${esc(key)}"${cvBusyNow?" disabled":""}>${cvBusyNow?"Updating CV…":"Update CV"}</button></div>
         <textarea class="ms-note" data-ms-note-key="${esc(key)}" maxlength="1200" rows="2" placeholder="MS note — e.g. emphasize AI, mention investments, do not mention Hondinn…">${esc(note)}</textarea>
         <div class="ms-status" data-ms-status aria-live="polite"></div>
       </div>
@@ -487,7 +530,7 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=47",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=48",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.primarySearch?.addEventListener("click",showSearchHome);
 els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
