@@ -1,14 +1,26 @@
 const MODES={search:{title:"Search",hint:"Best 10 opportunities across every U-Job theme, ranked together."},reasonable:{title:"Reasonable",hint:"Fintech-first Business Operations & Strategy roles — up to 10 verified matches."},creative:{title:"Creative",hint:"Interior, renovation, finishing, workshop and hands-on project roles."},dogs:{title:"Dogs",hint:"Dog, pet and animal-sector roles where Hondinn gives you a real edge."},kapellen:{title:"Kapellen",hint:"Strong-fit jobs close to Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},startup:{title:"Startup",hint:"High-potential Belgian tech startups and scale-ups, Antwerp first."},familyoffice:{title:"Family O.",hint:"Family offices, family capital, owner offices and boutique investment/operations roles."},fintech:{title:"Fintech",hint:"Belgium fintech roles matched to your banking, operations and tech profile."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Power-track institutions, defence, EU/NATO, policy and international influence — up to 10 verified roles."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
 const STORAGE_KEY="ujob:data";let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;const msBusy=new Set();const cvBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",familyoffice:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,familyoffice:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
 const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory"),primarySearch:$("primarySearch"),primaryDetails:$("primaryDetails"),detailsPanel:$("detailsPanel")};
-function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}
+function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}function isBlockedTarget(job){
+  const company=String(job?.company||"").trim();
+  return /^(?:ING|ING Bank|ING Belgium|ING Group)(?:\b|\s|[-–—])/i.test(company)||/\bING\s+(?:Bank|Belgium|Group)\b/i.test(company);
+}
+function cleanModeData(modeData){
+  const m=modeData||blankMode();
+  return {
+    ...m,
+    latest:(Array.isArray(m.latest)?m.latest:[]).filter(job=>!isBlockedTarget(job)),
+    runs:(Array.isArray(m.runs)?m.runs:[]).map(run=>({...run,jobs:(run.jobs||[]).filter(job=>!isBlockedTarget(job))}))
+  };
+}
+
 function emptyState(){return{activeMode:"search",activeView:"search",actions:{},msNotes:{},askHistory:[],search:blankMode(),reasonable:blankMode(),creative:blankMode(),dogs:blankMode(),kapellen:blankMode(),corporate:blankMode(),startup:blankMode(),familyoffice:blankMode(),fintech:blankMode(),ai:blankMode(),linkedin:blankMode(),global:blankMode(),swmo:blankMode(),prestige:blankMode(),highpaid:blankMode(),turkish:blankMode()}}
 function mergeRuns(a,b){const seen=new Set();return[...(a||[]),...(b||[])].filter(r=>r&&r.at&&Array.isArray(r.jobs)).sort((x,y)=>new Date(y.at)-new Date(x.at)).filter(r=>{const k=r.at+"|"+r.jobs.map(j=>j.url||j.title||"").join("|");if(seen.has(k))return false;seen.add(k);return true}).slice(0,250)}
 function mergeModeData(a,b){
   a=a||blankMode();b=b||blankMode();
   const at=a.lastUpdate?new Date(a.lastUpdate).getTime():0;
   const bt=b.lastUpdate?new Date(b.lastUpdate).getTime():0;
-  return{lastUpdate:bt>at?b.lastUpdate:a.lastUpdate,latest:bt>at?(Array.isArray(b.latest)?b.latest:[]):(Array.isArray(a.latest)?a.latest:[]),runs:mergeRuns(a.runs,b.runs),pendingSearch:b.pendingSearch||a.pendingSearch||null};
+  return cleanModeData({lastUpdate:bt>at?b.lastUpdate:a.lastUpdate,latest:bt>at?(Array.isArray(b.latest)?b.latest:[]):(Array.isArray(a.latest)?a.latest:[]),runs:mergeRuns(a.runs,b.runs),pendingSearch:b.pendingSearch||a.pendingSearch||null});
 }
 function mergeAskHistory(a,b){
   const seen=new Set();
@@ -23,9 +35,9 @@ function mergeState(base,raw){
   const out={...base};
   if(raw.activeMode==="politics")out.activeMode="prestige";else if(raw.activeMode&&MODES[raw.activeMode])out.activeMode=raw.activeMode;
   if(raw.activeView==="politics")out.activeView="prestige";else if(raw.activeView&&(MODES[raw.activeView]||raw.activeView==="actions"))out.activeView=raw.activeView;
-  out.actions={...(base.actions||{}),...(raw.actions||{})};
+  out.actions=Object.fromEntries(Object.entries({...(base.actions||{}),...(raw.actions||{})}).filter(([,job])=>!isBlockedTarget(job)));
   out.msNotes={...(base.msNotes||{}),...(raw.msNotes||{})};
-  out.askHistory=mergeAskHistory(base.askHistory,raw.askHistory);
+  out.askHistory=mergeAskHistory(base.askHistory,raw.askHistory).filter(item=>!isBlockedTarget(item.job));
   for(const mode of Object.keys(MODES))out[mode]=mergeModeData(out[mode],raw[mode]);
   if(raw.politics)out.prestige=mergeModeData(out.prestige,raw.politics);
   return out;
@@ -150,6 +162,7 @@ function render(){
   syncRunButton();
 }
 function renderResults(jobs,mode){
+  jobs=(jobs||[]).filter(job=>!isBlockedTarget(job));
   if(!jobs.length){
     els.results.innerHTML='<div class="empty">Run a search to find current vacancies.</div>';
     return;
@@ -326,6 +339,7 @@ async function analyzeAsk(){
   }finally{askBusy=false;els.askRun.disabled=false;els.askRun.textContent="Analyze"}
 }
 function renderActionResults(jobs){
+  jobs=(jobs||[]).filter(job=>!isBlockedTarget(job));
   if(!jobs.length){
     els.results.innerHTML='<div class="empty">Tick Watch on any vacancy to keep it here.</div>';
     return;
@@ -349,6 +363,7 @@ function renderActionResults(jobs){
   bindMsControls(els.results);
 }
 function renderHistory(runs,mode){
+  runs=(runs||[]).map(run=>({...run,jobs:(run.jobs||[]).filter(job=>!isBlockedTarget(job))})).filter(run=>run.jobs.length);
   if(!runs.length){
     els.history.innerHTML='<div class="empty">No history.</div>';
     return;
@@ -530,7 +545,7 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=48",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=49",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.primarySearch?.addEventListener("click",showSearchHome);
 els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
