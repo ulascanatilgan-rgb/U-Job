@@ -10,13 +10,13 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.2.0-niche-current-no-ing";
+const APP_VERSION = "4.3.0-investment-search12-fit";
 
 const MODES = {
   search: {
     label: "Search",
     geography: "Belgium first, prioritising Antwerp/Kapellen, Brussels and Ghent. Include strong hybrid Belgium roles. Also allow exceptional EU-institutional, Europe/EMEA remote, Switzerland/Monaco or other international roles only when they clearly outperform Belgian options on fit, prestige, compensation or career leverage.",
-    focus: "Master search across every U-Job theme. Find the ten strongest current vacancies for this candidate across fintech/business operations, startups, banking/corporate, AI/technology, prestige/EU/NATO/international institutions, high-paid strategic roles, local Kapellen/Antwerp opportunities, creative/interior/renovation work, dog/pet-sector roles, Turkish-market roles and exceptional global/SW-MO opportunities. Rank by realistic candidacy first, then role quality, ownership, international exposure, compensation/career upside, enjoyment and future optionality. Prefer English-speaking roles and reject mandatory professional Dutch/French, junior/repetitive work and major must-have gaps."
+    focus: "Master search across every U-Job theme. Find the twelve strongest current vacancies for this candidate across every Details theme: reasonable/fintech/business operations, startups, family offices, investment/wealth/research/economics, banking/corporate, AI/technology, prestige/EU/NATO/international institutions, high-paid strategic roles, local Kapellen/Antwerp opportunities, creative/lifestyle/interior work, dog/pet-sector roles, Turkish-market roles and exceptional global/SW-MO opportunities. Rank by realistic candidacy first, then role quality, ownership, international exposure, compensation/career upside, enjoyment and future optionality. Do not include attractive roles with a hard domain-experience requirement the candidate does not meet. Prefer English-speaking roles and reject mandatory professional Dutch/French, junior/repetitive work and major must-have gaps."
   },
   reasonable: {
     label: "Reasonable",
@@ -52,6 +52,11 @@ const MODES = {
     label: "Startup",
     geography: "Belgium only, with Antwerp first, then Brussels and Ghent; include Leuven/Mechelen only for unusually strong fit. Hybrid Belgium-based roles are welcome.",
     focus: "High-potential modern-technology startups and scale-ups with real growth signals, differentiated technology or a strong digital product. Prioritise companies in AI, fintech/payments, cybersecurity, SaaS, data/infrastructure, robotics, climate/energy tech, space/deep-tech, mobility, biotech/health-tech and other future-facing sectors. Search roles where the candidate can genuinely compete: Business Operations, Strategy & Operations, Operations Manager, Chief of Staff, Business Manager, Customer Success/Client Operations, Implementation, Partnerships, Product Operations, Programme/Project Operations, Commercial Operations, Transformation and founder/executive right-hand roles. Prefer English-speaking international teams, visible ownership, direct founder/leadership exposure, meaningful responsibility, fast learning and credible career/equity upside. Use the candidate's banking/fintech, operations, stakeholder management, controls/security, analytics, entrepreneurship and hands-on AI/web-app building as strengths. Reject pre-revenue hobby projects with no hiring substance, junior roles, pure coding/research roles with major gaps, generic sales-only roles and mandatory professional Dutch/French."
+  },
+  investment: {
+    label: "Investment",
+    geography: "Belgium first, prioritising Antwerp and Brussels; then Ghent/Leuven/Mechelen for strong English-speaking fit. Hybrid roles are welcome. Exceptional Luxembourg/nearby EU opportunities only when the match is unusually strong and realistic.",
+    focus: "Investment and markets roles that combine business judgement, analytics, banking knowledge and technology without demanding a long established front-office investment track record. Search investment/product operations, wealth-management operations/strategy, investment product specialist or product management, portfolio/reporting analytics, investment data/market-data roles, research operations, market intelligence, economic/market analysis, investment solutions, securities/custody/product roles, investment technology/fintech, client investment operations and selected Equity Research/Investment Research Associate or Economist/Research Analyst roles where adjacent banking/analytics experience is accepted. The candidate follows financial markets and macroeconomics, builds UlasTrade for fundamental/technical investment research, has strong banking/control/operations/data experience and an MSc IT background, but does NOT have years of professional portfolio-management, equity-research or private-banking advisory experience. Prefer roles where analytical ability, structured thinking, product/process knowledge, data/technology and stakeholder skills matter. Reject Portfolio Manager, Senior Equity Analyst, Senior Economist, Investment Director, relationship/private-banker roles requiring an existing HNW book, CFA-mandatory roles, and vacancies requiring 5+ years specifically in professional equity research, asset management, portfolio management, M&A/IB execution or investment advisory unless the requirement explicitly accepts broad banking/operations experience."
   },
   fintech: {
     label: "Fintech",
@@ -199,6 +204,7 @@ function cleanJob(job) {
     url: normalizeUrl(job?.url),
     publishedDate: String(job?.publishedDate || "").trim(),
     openCheck: String(job?.openCheck || "").trim(),
+    matchCheck: String(job?.matchCheck || "").trim(),
     languageCheck: String(job?.languageCheck || "").trim(),
     remoteCheck: String(job?.remoteCheck || "").trim(),
     mobilityCheck: String(job?.mobilityCheck || "").trim(),
@@ -212,12 +218,13 @@ function cleanJob(job) {
 
 const MODE_SOURCE_PLANS = {
   "search": [
-    "WAVE 1 — strongest realistic career moves: fintech/startup/business operations, Strategy & Operations, Chief of Staff, Business Manager, Product/Customer Ops, implementation and transformation across Antwerp/Brussels/Ghent.",
-    "WAVE 2 — premium corporate/financial/AI: banks, fintech/payments, family offices/family capital, AI/technology, cybersecurity, investment/product operations and high-paid strategic roles.",
-    "WAVE 3 — prestige/power track: EU/NATO/EDA/Commission/Parliament/international institutions, policy/security/governance and internationally prestigious employers.",
-    "WAVE 4 — local/entrepreneurial fit: Kapellen/Antwerp local roles, interior/renovation/creative operations and dog/pet-sector roles where direct entrepreneurial experience creates an edge.",
-    "WAVE 5 — optionality: Turkish-market roles plus exceptional Europe/EMEA remote, Switzerland/Monaco or other international roles only if clearly stronger than ordinary Belgian alternatives.",
-    "Use official employer/ATS pages first where practical; LinkedIn, Welcome to the Jungle, Wellfound, VDAB, Jobat and strong recruiters for discovery. Do not impose category quotas: return the overall best ten by fit and quality."
+    "COVERAGE 1 — core realistic moves: Reasonable + Fintech + Startup + Corporate; operations, strategy, business manager, product/customer ops, implementation and transformation.",
+    "COVERAGE 2 — money & ownership: Investment + Family O. + High Paid; investment product/operations/data/research, family capital, owner office, strategic and compensation-upside roles.",
+    "COVERAGE 3 — future & influence: AI + Prestige; technology/AI adoption and EU/NATO/EDA/international institutional roles.",
+    "COVERAGE 4 — location & lifestyle: Kapellen + Creative + Dogs; local northern-Antwerp roles, niche classy/luxury/interior businesses and pet-sector opportunities.",
+    "COVERAGE 5 — channels & optionality: LinkedIn + Turkish + Global + SW-MO; recent LinkedIn discovery, Turkey-linked roles and exceptional international options.",
+    "Touch every Details theme during discovery, but do not impose final category quotas. Rank all surviving vacancies together and return the overall best twelve.",
+    "Use official employer/ATS pages first where practical; specialist recruiters, niche boards, portfolio-company ecosystems, LinkedIn, Welcome to the Jungle, Wellfound, VDAB/Jobat and credible public company/founder posts for hidden-gem discovery."
   ],
 
   "reasonable": [
@@ -259,6 +266,13 @@ const MODE_SOURCE_PLANS = {
   ],
   "corporate": [
     "Bank/private-bank/international-bank career pages first; senior operations, business management, transformation, investment/product ops, payments, financial-crime technology, security governance and risk-tech."
+  ],
+  "investment": [
+    "WAVE 1: Belgian asset managers, private banks, wealth/investment platforms, securities/custody firms and investment-product teams; target Investment Product, Investment Operations, Portfolio/Reporting Analytics, Investment Data, Product/Proposition and Client Investment Operations.",
+    "WAVE 2: research/economics/markets teams at banks, brokers, exchanges, financial-data providers, fintechs, consultancies, federations and institutions; search Market Intelligence, Research Analyst/Associate, Economic Analyst, Investment Research Operations and market-data roles where adjacent banking/analytics experience is accepted.",
+    "WAVE 3: investment-tech/wealth-tech/fintech employers where finance knowledge and technology/process skills intersect; include product operations, implementation, solutions, data/reporting and investment-platform roles.",
+    "WAVE 4: boutique investment houses, family offices and specialist recruiters for hidden-gem analyst/operations/product roles. Verify exact experience requirements before accepting.",
+    "Reject roles requiring 5+ years specifically in equity research, portfolio management, asset management, investment banking/M&A execution or professional investment advisory unless the vacancy explicitly treats broader banking/operations/analytics experience as equivalent. CFA can be preferred but must not be mandatory unless another stated route clearly fits."
   ],
   "fintech": [
     "Fintech/payments/digital-bank/regtech/wealth-tech/financial-infrastructure company career pages and ATS first; then LinkedIn, Welcome to the Jungle, Wellfound and specialist recruiters for discovery; verify official vacancy."
@@ -302,9 +316,9 @@ function buildPrompt(mode, seenUrls) {
 
   const seen = seenUrls.slice(-50).map(normalizeUrl).filter(Boolean);
   const maxAge = mode === "linkedin" ? 7 : 30;
-  const target = mode === "search" ? 24 : mode === "prestige" ? 15 : mode === "creative" ? 12 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
-  const finalTarget = mode === "search" ? "8-10" : (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
-  const stopAt = (mode === "search" || mode === "reasonable" || mode === "prestige") ? 10 : 5;
+  const target = mode === "search" ? 30 : mode === "prestige" ? 15 : mode === "creative" ? 12 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "investment" || mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
+  const finalTarget = mode === "search" ? "10-12" : (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
+  const stopAt = mode === "search" ? 12 : (mode === "reasonable" || mode === "prestige") ? 10 : 5;
 
   const special = mode === "linkedin"
     ? "LINKEDIN: LinkedIn job pages only; <=7 days; final URL must be the LinkedIn vacancy."
@@ -322,7 +336,9 @@ function buildPrompt(mode, seenUrls) {
                 ? "DOGS: employer/business must genuinely operate in dog/pet/animal services, pet-tech, pet food/products, veterinary/animal health, pet insurance or closely related animal-sector activity. Prioritise Hondinn-relevant operational/commercial roles; reject generic low-skill animal-care jobs."
                 : mode === "startup"
                   ? "STARTUP: employer must be a genuine startup/scale-up or modern high-growth technology company with current hiring substance. English must be sufficient."
-                  : mode === "familyoffice"
+                  : mode === "investment"
+                    ? "INVESTMENT: prioritise bridge roles combining finance/markets with business, analytics, operations or technology. Reject hard requirements for long direct front-office investment experience that the candidate does not have."
+                    : mode === "familyoffice"
                     ? "FAMILY O.: employer must genuinely be a family office, multi-family office, family investment/holding structure, owner office, wealth/investment boutique or family-controlled group. Reject roles whose core requirement is tax-law expertise, a pre-existing HNW sales book or specialist discretionary portfolio management."
                     : mode === "search"
                     ? "SEARCH: this is the master ranking across every U-Job theme. Do not force category diversity or quotas; return the ten strongest roles overall."
@@ -352,12 +368,15 @@ SEARCH PLAN
 - Reject stale/closed/expired/cached-only/search-index-only listings, generic careers pages, guessed dates, missing application paths, major must-have gaps, junior/repetitive roles and irrelevant matches.
 - Prefer unseen roles. Seen URLs may be reused only if still live and needed for a strong result set.
 - Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : "6.5"}.
+- HARD-MATCH RULE for every mode: read the must-have experience requirements, not only the title. If the vacancy requires multiple years of specific domain experience the candidate clearly does not possess, REJECT it even if the employer/sector is attractive. Transferable banking/operations/analytics experience counts only when the vacancy wording reasonably allows adjacent/relevant experience.
+- For accepted roles output MATCH_CHECK: NO_HARD_GAP | short explanation of why the mandatory experience requirements are realistically met or transferable.
 - Prestige mode: candidate is Belgian/EU citizen and age 35. Check explicit age, nationality, clearance and status requirements. Do not reject Belgian/EU nationality requirements. Reject age-capped programmes if 35 is outside the allowed range. Output AGE_CHECK with the eligibility conclusion.
 - Creative mode: hands-on trade roles are acceptable only with credible transferable experience; reject mandatory craft licences/certificates or deep specialist experience the candidate lacks.
 - Dogs mode: Hondinn is relevant operating experience. Require a genuine pet/animal-sector employer and favour operations/customer/commercial/project roles that use that experience; do not fill with generic kennel attendants, groomers or veterinary-clinician roles.
 - Startup mode: require a genuine modern-technology startup/scale-up with credible hiring substance; favour roles with ownership and leadership exposure. Do not invent funding, runway, valuation or growth claims.
 - Family O. mode: favour broad operator/right-hand/investment-operations/governance roles where banking, controls, reporting, stakeholder and entrepreneurial experience transfer directly. Reject pure estate-tax-law, client-book-dependent private banking and specialist portfolio-management roles.
-- Search mode: evaluate all categories on one common score and return the overall top ten, not ten per category.
+- Investment mode: favour bridge roles in investment product/operations/data/research/economics/wealth-tech. Reject senior/specialist roles whose must-haves depend on years of direct professional investing, portfolio management, equity research, investment banking/M&A or a HNW client book.
+- Search mode: cover every Details theme during discovery, enforce the same hard-match rule, then rank all categories on one common score and return the overall top twelve. Diversity is desirable only among genuinely strong matches; never add a weaker role just to represent a category.
 - Fintech mode: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure; ordinary banks qualify only for a clearly fintech/technology venture or product unit.
 - WHY_FIT lines must be short and specific: profile fit; work/scope appeal; career/compensation leverage. Never invent salary.
 
@@ -377,6 +396,7 @@ LOCATION: ...
 DIRECT_URL: https://...
 PUBLISHED_DATE: YYYY-MM-DD
 OPEN_CHECK: CURRENTLY_OPEN ${today} | exact vacancy page re-opened; application path verified
+MATCH_CHECK: NO_HARD_GAP | mandatory experience realistically matched: ...
 LANGUAGE_CHECK: English sufficient; no other language mandatory.
 AGE_CHECK: ${mode === "prestige" ? "Eligible at age 35; explicit age rule checked: ..." : "N/A"}
 REMOTE_CHECK: ${mode === "global" ? "Belgium/Europe/EMEA eligibility verified: ..." : "N/A"}
@@ -386,7 +406,7 @@ WHY_FIT_1: ...
 WHY_FIT_2: ...
 WHY_FIT_3: ...
 
-For Search, Reasonable and Prestige, return up to 10 verified roles; for every other mode return up to 5. If fewer than 3 roles survive only after fully checking the relevant sources, return those valid roles. If none survive: NO_VERIFIED_JOBS.`;
+For Search return up to 12 verified roles. For Reasonable and Prestige return up to 10. For every other mode return up to 5. If fewer than 3 roles survive only after fully checking the relevant sources, return those valid roles. If none survive: NO_VERIFIED_JOBS.`;
 }
 
 function parseVerifiedJobs(text) {
@@ -420,6 +440,7 @@ function parseVerifiedJobs(text) {
       url: fields.DIRECT_URL || "",
       publishedDate: fields.PUBLISHED_DATE || "",
       openCheck: fields.OPEN_CHECK || "",
+      matchCheck: fields.MATCH_CHECK || "",
       languageCheck: fields.LANGUAGE_CHECK || "",
       ageCheck: fields.AGE_CHECK || "",
       remoteCheck: fields.REMOTE_CHECK || "",
@@ -438,6 +459,7 @@ function buildStrictPrompt(prompt, mode) {
 FINAL CHECK BEFORE OUTPUT
 - Re-open/check each final vacancy or ATS/recruiter page in this same run. Do not rely on search snippets, cached pages or old indexed copies.
 - Exact date + currently accepting applications + direct vacancy URL + visible application path are mandatory. OPEN_CHECK must explicitly confirm the page was re-opened today.
+- MATCH_CHECK is mandatory: output NO_HARD_GAP only after checking the vacancy must-haves against the candidate. Reject roles with a hard specific-experience gap.
 - ING / ING Bank / ING Belgium / ING Group vacancies are forbidden in every mode.
 - English must be sufficient; mandatory Dutch/French rejects the role. SW-MO also rejects mandatory German/Italian.
 - LinkedIn: <=7 days and LinkedIn job URL.
@@ -447,7 +469,7 @@ FINAL CHECK BEFORE OUTPUT
 - KAPELLEN: final location must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or a clearly local adjacent northern-Antwerp location named in the mode geography.
 - CREATIVE: seek distinctive premium/lifestyle/heritage environments (clubs, yachts, classic/performance cars, tailoring, watches, estates, private aviation, boutique hospitality, wine/spirits, design/interiors). Reject generic retail/hospitality filler and hands-on trade jobs requiring qualifications the candidate lacks.
 - DOGS: final employer must be genuinely dog/pet/animal-sector related; English sufficient; reject mandatory professional Dutch/French and low-skill animal-care filler roles.
-- ${(mode === "search" || mode === "reasonable" || mode === "prestige") ? (mode === "search" ? "Search: rank all themes together and return up to 10 excellent roles." : mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: aim for 6-10 excellent roles, maximum 10.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
+- ${(mode === "search" || mode === "reasonable" || mode === "prestige") ? (mode === "search" ? "Search: cover all Details themes, rank them together and return up to 12 excellent roles." : mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: aim for 6-10 excellent roles, maximum 10.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
 - Do not output rejected roles or commentary.`;
 }
 
@@ -532,6 +554,12 @@ function hasCurrentOpenCheck(job) {
     !/closed|expired|no longer|filled|archived/i.test(check);
 }
 
+function hasNoHardExperienceGap(job) {
+  const check = String(job?.matchCheck || "");
+  return /^NO_HARD_GAP\b/i.test(check) &&
+    !/\b(hard gap|not met|does not meet|missing required|insufficient direct|lacks required)\b/i.test(check);
+}
+
 function finalizeJobsFromResponse(data, mode = "") {
   const outputText = extractOutputText(data);
   if (!outputText) return [];
@@ -547,6 +575,7 @@ function finalizeJobsFromResponse(data, mode = "") {
     .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url) && job.whyFit.length === 3)
     .filter(job => !isBlockedTargetEmployer(job))
     .filter(job => hasCurrentOpenCheck(job))
+    .filter(job => hasNoHardExperienceGap(job))
     .filter(job => isAllowedPublishedDate(job.publishedDate, mode))
     .filter(job => job.score >= (mode === "global" ? 7.5 : mode === "swmo" ? 7.2 : 6.5))
     .filter(job => mode !== "linkedin" || isLinkedInJobUrl(job.url))
@@ -575,7 +604,7 @@ function finalizeJobsFromResponse(data, mode = "") {
       return true;
     })
     .sort((a, b) => b.score - a.score)
-    .slice(0, (mode === "search" || mode === "reasonable" || mode === "prestige") ? 10 : 5);
+    .slice(0, mode === "search" ? 12 : (mode === "reasonable" || mode === "prestige") ? 10 : 5);
 }
 
 
@@ -1248,7 +1277,7 @@ async function startSearch(req, res) {
         }],
         tool_choice: "required",
         input: strictPrompt,
-        max_output_tokens: mode === "search" ? 4000 : mode === "prestige" ? 3900 : mode === "reasonable" ? 3600 : 3200
+        max_output_tokens: mode === "search" ? 4600 : mode === "prestige" ? 3900 : mode === "reasonable" ? 3600 : 3200
       })
     });
 
