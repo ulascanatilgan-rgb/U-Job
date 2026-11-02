@@ -623,7 +623,7 @@ STYLE
 - Paraphrase the employer's requirement; do not copy long vacancy wording.
 - Make the match concrete: "you need X; I have done Y" logic without sounding formulaic.
 - No invented achievements, percentages, team sizes, software, languages or responsibilities.
-- Intro <=50 words. Each point <=42 words, ideally 1-2 sentences.
+- Intro <=40 words. Each point <=34 words, ideally one compact sentence or two very short sentences.
 - No Dear/Sincerely/contact details/closing paragraph.
 
 OUTPUT EXACTLY:
@@ -693,30 +693,30 @@ function buildMotivationPdf(job, ms) {
   };
   const rule = (x1,y1,x2,y2,gray=0.88) => commands.push(`${gray} G 0.6 w ${x1} ${y1} m ${x2} ${y2} l S`);
 
-  let y = 794;
-  text("Ulas Atilgan", 48, y, 10.2, true, 0.10); y -= 16;
-  text(job.title || "Application", 48, y, 9.1, false, 0.28); y -= 13;
-  if (job.company) { text(job.company, 48, y, 9.1, false, 0.28); y -= 24; }
-  rule(48,y+9,547,y+9,0.90);
-  text("Motivation Statement", 48, y-7, 17.2, true, 0.08); y -= 32;
+  let y = 797;
+  text("Ulas Atilgan", 46, y, 10.4, true, 0.10); y -= 16;
+  text(job.title || "Application", 46, y, 9.2, false, 0.27); y -= 13;
+  if (job.company) { text(job.company, 46, y, 9.2, false, 0.27); y -= 23; }
+  rule(46,y+9,549,y+9,0.89);
+  text("Motivation Statement", 46, y-7, 17.0, true, 0.08); y -= 31;
 
-  const introLines = wrapPdfText(ms.intro, 99).slice(0,5);
-  for (const line of introLines) { text(line,48,y,9.0,false,0.20); y -= 11.5; }
-  y -= 10;
+  const introLines = wrapPdfText(ms.intro, 116).slice(0,4);
+  for (const line of introLines) { text(line,46,y,8.9,false,0.20); y -= 11.4; }
+  y -= 9;
 
-  const bodySize = 8.35, bodyLead = 10.0;
+  const bodySize = 8.55, bodyLead = 10.35;
   for (let i=0;i<7;i++) {
     const p = ms.points[i];
     const num = String(i+1).padStart(2,"0");
-    text(num,48,y,9.3,true,0.42);
-    text(p.title,78,y,9.3,true,0.12);
-    y -= 13;
-    const lines = wrapPdfText(p.text, 96).slice(0,5);
-    for (const line of lines) { text(line,78,y,bodySize,false,0.24); y -= bodyLead; }
-    y -= 7;
+    text(num,46,y,9.1,true,0.43);
+    text(p.title,67,y,9.1,true,0.11);
+    y -= 12.5;
+    const lines = wrapPdfText(p.text, 114).slice(0,4);
+    for (const line of lines) { text(line,58,y,bodySize,false,0.23); y -= bodyLead; }
+    y -= 6.2;
   }
 
-  if (y < 35) throw new Error("Generated motivation statement is too long for the one-page format.");
+  if (y < 38) throw new Error("Generated motivation statement is too long for the one-page format.");
 
   const stream = commands.join("\n");
   const objects = [
