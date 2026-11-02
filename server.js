@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.1.0-family-office-cv";
+const APP_VERSION = "4.2.0-niche-current-no-ing";
 
 const MODES = {
   search: {
@@ -25,8 +25,8 @@ const MODES = {
   },
   creative: {
     label: "Creative",
-    geography: "Antwerp province first, especially Kapellen/Brasschaat/Schoten/Ekeren/Antwerp; wider Belgium only for an unusually strong creative/renovation fit.",
-    focus: "Hands-on, design-led and entrepreneurial roles. Search interior design, renovation, painting/decorating, interior finishing, flooring, microcement/plastering, cabinetry/joinery, carpentry, furniture/workshop/atelier, kitchen/interior fit-out, premium residential renovation, showroom/project operations and technical-commercial interior roles. Include Interior/Renovation Project Manager or Coordinator, Site/Works Coordinator, Operations/Workshop Manager, Project Support, Estimator/Planner, Client/Showroom Project roles and realistic skilled hands-on roles when formal trade credentials are not a hard blocker. Also retain strong-fit premium automotive, yacht/marine, luxury, travel/experience, premium hospitality, sports/leisure, estates, family offices, animal/dog businesses and founder-led companies. Use the candidate's real interior/renovation venture experience, entrepreneurship, customer contact, planning, hands-on problem solving, operational ownership and technology/automation mindset. Prefer roles with visible output, client contact and ownership; reject generic low-skill labour, junior apprenticeships and roles requiring a trade licence/certificate or deep specialist craft experience the candidate clearly lacks."
+    geography: "Antwerp province first, especially Kapellen/Brasschaat/Schoten/Ekeren/Antwerp; Brussels and wider Belgium only for an unusually strong premium/lifestyle/creative fit.",
+    focus: "Niche, tasteful, high-character work with visible lifestyle appeal and real transferable fit. Keep interior design, renovation, painting/decorating, finishing, flooring, microcement/plastering, cabinetry/joinery/carpentry, furniture/workshop/atelier, premium fit-out and showroom/project operations. Add an 'old-money / modern gentleman / discreet luxury' layer: private members' clubs, boutique hotels, heritage hospitality, yacht/superyacht and marine businesses, classic/performance cars and premium automotive, watches/jewellery, tailoring/menswear, wine/spirits and fine-food houses, golf/equestrian/leisure clubs, private aviation, concierge/lifestyle services, estates/property management, auction/art/design houses, premium events, luxury travel and family-owned heritage brands. Prioritise Business/Operations Manager, Project/Experience Operations, Client Relations, Partnerships, Membership/Club Operations, Estate/Property Operations, Showroom/Commercial Operations, Events/Guest Experience, Founder/Owner Office, workshop/project coordination and technical-commercial roles where the candidate can realistically contribute. The target is not generic luxury retail or low-skill service work; look for distinctive, socially polished, international environments with ownership, discretion, customer contact, craft/design proximity and a strong lifestyle identity. Use interior/renovation experience, entrepreneurship, customer operations, project/stakeholder management and technology/automation where relevant. Reject junior retail-floor jobs, generic hospitality shifts, pure commission sales, craft roles requiring qualifications the candidate lacks and mandatory professional Dutch/French."
   },
   dogs: {
     label: "Dogs",
@@ -198,6 +198,7 @@ function cleanJob(job) {
     location: String(job?.location || "").trim(),
     url: normalizeUrl(job?.url),
     publishedDate: String(job?.publishedDate || "").trim(),
+    openCheck: String(job?.openCheck || "").trim(),
     languageCheck: String(job?.languageCheck || "").trim(),
     remoteCheck: String(job?.remoteCheck || "").trim(),
     mobilityCheck: String(job?.mobilityCheck || "").trim(),
@@ -225,10 +226,12 @@ const MODE_SOURCE_PLANS = {
     "WAVE 3: adjacent high-fit fintech/payment/financial-infrastructure roles; use LinkedIn, Welcome to the Jungle, Wellfound and Robert Walters/Hays/Michael Page for discovery, then verify official/ATS."
   ],
   "creative": [
-    "WAVE 1: interior design/renovation/fit-out companies, painting/decorating, flooring, microcement/plastering, cabinetry/joinery/carpentry, furniture/workshop/atelier and kitchen/interior companies in Antwerp province.",
-    "WAVE 2: Interior/Renovation Project Manager or Coordinator, Site/Works Coordinator, Operations/Workshop Manager, estimator/planner, showroom/client-project and technical-commercial interior roles.",
-    "WAVE 3: premium automotive, yacht/marine, luxury, hospitality/experience, estates, sports/leisure, animal/dog and founder-led businesses only with credible transferable fit.",
-    "Use employer sites, VDAB, Jobat, LinkedIn and specialist construction/interior recruiters for discovery; verify the final vacancy directly."
+    "WAVE 1 — crafted interiors: premium interior studios, renovation/fit-out firms, cabinetry/joinery, furniture ateliers, kitchens, lighting, materials, architectural showrooms and high-end residential project companies around Antwerp.",
+    "WAVE 2 — gentleman/lifestyle: private members' clubs, golf/equestrian clubs, heritage/boutique hotels, concierge and luxury-experience companies, estates/property operations, premium event houses and discreet service businesses.",
+    "WAVE 3 — objects & mobility: yacht/superyacht/marine firms, classic/performance-car specialists, premium automotive/importers, watches/jewellery, tailoring/menswear, wine/spirits/fine-food houses, private aviation and luxury travel.",
+    "WAVE 4 — culture & ownership: auction houses, galleries/design houses, family-owned heritage brands, founder/owner offices and small premium businesses where a broad operator/project/client role can have visible impact.",
+    "HIDDEN-GEM DISCOVERY: search boutique recruiter pages, specialist trade/luxury boards, employer newsletters, public LinkedIn/company posts, founder/owner posts and credible public social-media career announcements. A social post is discovery only: the final result must still have a current identifiable vacancy/application page or a direct recruiter vacancy page.",
+    "Search role synonyms such as Club Manager/Operations, Membership Operations, Guest Experience, Client Relations, Estate/Property Operations, Experience Manager, Project Coordinator, Showroom Operations, Partnerships, Founder/Owner Office and Business Manager. Do not fill with generic retail/hospitality."
   ],
   "dogs": [
     "WAVE 1: dog hotel/daycare/boarding, premium pet-service and dog-care businesses in Kapellen/Antwerp; search operations, coordination, customer and business roles rather than generic animal-care labour.",
@@ -298,7 +301,7 @@ function buildPrompt(mode, seenUrls) {
   }).format(new Date());
 
   const seen = seenUrls.slice(-50).map(normalizeUrl).filter(Boolean);
-  const maxAge = mode === "linkedin" ? 7 : (mode === "global" || mode === "swmo") ? 30 : 60;
+  const maxAge = mode === "linkedin" ? 7 : 30;
   const target = mode === "search" ? 20 : mode === "prestige" ? 15 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "creative" || mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
   const finalTarget = (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
   const stopAt = (mode === "reasonable" || mode === "prestige") ? 10 : 5;
@@ -338,13 +341,15 @@ SEARCH PLAN
 - Use ONLY the focused source plan below. Start each wave with one broad discovery query, then targeted verification. Avoid equivalent/repeated queries and do not re-search the same domain without a reason.
 - Prefer official employer/institution and direct ATS pages. Use job boards/recruiters mainly for discovery, then verify the final vacancy directly whenever possible.
 - Hidden-gem layer: also inspect niche sector boards, boutique/executive recruiters, VC/PE or holding portfolio-company career pages, chambers/associations, accelerator ecosystems, local employer career pages and credible spontaneous-opportunity pages when relevant to the selected mode.
+- Also use credible public employer/founder LinkedIn posts, public company social posts/newsletters and community pages as discovery signals for niche roles. Never return a social post by itself unless it contains a clear current application path and the vacancy can be independently verified.
+- GLOBAL EMPLOYER EXCLUSION: never return ING, ING Bank, ING Belgium or any ING Group vacancy in ANY mode. The candidate's ING experience may be used as evidence of fit, but ING is not an eligible target employer.
 - Search role synonyms and employer ecosystems, not only exact job titles. Example: Business Operations may appear as Business Manager, Strategic Projects, Portfolio Operations, Founder/Owner Office, Programme Operations or Chief of Staff.
 - Broad aggregators are gap-fillers, not the primary evidence source. Final results should favour direct employer/ATS or identifiable recruiter vacancy pages.
 - Drop obvious location/language/seniority/skill mismatches early instead of spending web calls on them.
 - If fewer than 3 valid roles remain, complete the relevant waves before returning. Reasonable/Prestige may continue until 10 strong verified roles.
-- Freshness: prefer <=7 days, then <=14, then <=30; max age ${maxAge} days. LinkedIn never exceeds 7 days.
-- Verify EACH final role: exact YYYY-MM-DD publication date, vacancy still open, direct application page, English sufficient, no mandatory extra language, real profile fit.
-- Reject stale/closed/generic-careers pages, guessed dates, major must-have gaps, junior/repetitive roles and irrelevant matches.
+- Freshness: prefer <=7 days, then <=14, then <=30; absolutely reject anything older than ${maxAge} days. LinkedIn never exceeds 7 days.
+- Verify EACH final role by RE-OPENING the exact vacancy in this run: exact YYYY-MM-DD publication date, role still visibly open, a live application path/button or explicit current application instruction, English sufficient, no mandatory extra language, real profile fit.
+- Reject stale/closed/expired/cached-only/search-index-only listings, generic careers pages, guessed dates, missing application paths, major must-have gaps, junior/repetitive roles and irrelevant matches.
 - Prefer unseen roles. Seen URLs may be reused only if still live and needed for a strong result set.
 - Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : "6.5"}.
 - Prestige mode: candidate is Belgian/EU citizen and age 35. Check explicit age, nationality, clearance and status requirements. Do not reject Belgian/EU nationality requirements. Reject age-capped programmes if 35 is outside the allowed range. Output AGE_CHECK with the eligibility conclusion.
@@ -371,6 +376,7 @@ COMPANY: ...
 LOCATION: ...
 DIRECT_URL: https://...
 PUBLISHED_DATE: YYYY-MM-DD
+OPEN_CHECK: CURRENTLY_OPEN ${today} | exact vacancy page re-opened; application path verified
 LANGUAGE_CHECK: English sufficient; no other language mandatory.
 AGE_CHECK: ${mode === "prestige" ? "Eligible at age 35; explicit age rule checked: ..." : "N/A"}
 REMOTE_CHECK: ${mode === "global" ? "Belgium/Europe/EMEA eligibility verified: ..." : "N/A"}
@@ -413,6 +419,7 @@ function parseVerifiedJobs(text) {
       location: fields.LOCATION || "",
       url: fields.DIRECT_URL || "",
       publishedDate: fields.PUBLISHED_DATE || "",
+      openCheck: fields.OPEN_CHECK || "",
       languageCheck: fields.LANGUAGE_CHECK || "",
       ageCheck: fields.AGE_CHECK || "",
       remoteCheck: fields.REMOTE_CHECK || "",
@@ -429,15 +436,16 @@ function buildStrictPrompt(prompt, mode) {
   return `${prompt}
 
 FINAL CHECK BEFORE OUTPUT
-- Re-open/check each final vacancy or ATS page in this same run.
-- Exact date + currently accepting applications + direct vacancy URL are mandatory.
+- Re-open/check each final vacancy or ATS/recruiter page in this same run. Do not rely on search snippets, cached pages or old indexed copies.
+- Exact date + currently accepting applications + direct vacancy URL + visible application path are mandatory. OPEN_CHECK must explicitly confirm the page was re-opened today.
+- ING / ING Bank / ING Belgium / ING Group vacancies are forbidden in every mode.
 - English must be sufficient; mandatory Dutch/French rejects the role. SW-MO also rejects mandatory German/Italian.
 - LinkedIn: <=7 days and LinkedIn job URL.
 - Global: <=30 days and explicit Belgium/EU/Europe/EMEA remote eligibility.
 - SW-MO: <=30 days and realistic Belgian/EU-citizen mobility.
 - PRESTIGE: candidate is Belgian/EU citizen, age 35. Check explicit age/nationality/clearance/status rules. Reject only if a real rule makes the candidate ineligible; Belgian/EU-nationality requirements are acceptable.
 - KAPELLEN: final location must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or a clearly local adjacent northern-Antwerp location named in the mode geography.
-- CREATIVE: reject hands-on trade jobs requiring a craft licence/certificate or deep specialist experience the candidate lacks.
+- CREATIVE: seek distinctive premium/lifestyle/heritage environments (clubs, yachts, classic/performance cars, tailoring, watches, estates, private aviation, boutique hospitality, wine/spirits, design/interiors). Reject generic retail/hospitality filler and hands-on trade jobs requiring qualifications the candidate lacks.
 - DOGS: final employer must be genuinely dog/pet/animal-sector related; English sufficient; reject mandatory professional Dutch/French and low-skill animal-care filler roles.
 - ${(mode === "search" || mode === "reasonable" || mode === "prestige") ? (mode === "search" ? "Search: rank all themes together and return up to 10 excellent roles." : mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: aim for 6-10 excellent roles, maximum 10.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
 - Do not output rejected roles or commentary.`;
@@ -461,7 +469,7 @@ function isAllowedPublishedDate(value, mode = "") {
   const today = Date.UTC(ty, tm - 1, td);
   const ageDays = (today - published) / 86400000;
 
-  const maxAgeDays = mode === "linkedin" ? 7 : (mode === "global" || mode === "swmo") ? 30 : 60;
+  const maxAgeDays = mode === "linkedin" ? 7 : 30;
   return Number.isFinite(ageDays) && ageDays >= 0 && ageDays <= maxAgeDays;
 }
 
@@ -508,6 +516,22 @@ function isKapellenArea(job) {
   return /\b(kapellen|brasschaat|kalmthout|stabroek|schoten|ekeren|hoevenen|mariaburg|merksem|antwerp[- ]north|antwerpen[- ]noord)\b/i.test(location);
 }
 
+function isBlockedTargetEmployer(job) {
+  const company = String(job?.company || "").trim();
+  return /^(?:ING|ING Bank|ING Belgium|ING Group)(?:\b|\s|[-–—])/i.test(company) || /\bING\s+(?:Bank|Belgium|Group)\b/i.test(company);
+}
+
+function hasCurrentOpenCheck(job) {
+  const check = String(job?.openCheck || "");
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit"
+  }).format(new Date());
+  return check.includes("CURRENTLY_OPEN") &&
+    check.includes(today) &&
+    /application|apply|application path|application instruction/i.test(check) &&
+    !/closed|expired|no longer|filled|archived/i.test(check);
+}
+
 function finalizeJobsFromResponse(data, mode = "") {
   const outputText = extractOutputText(data);
   if (!outputText) return [];
@@ -521,6 +545,8 @@ function finalizeJobsFromResponse(data, mode = "") {
   return (Array.isArray(parsed.jobs) ? parsed.jobs : [])
     .map(cleanJob)
     .filter(job => job.title && job.company && /^https?:\/\//i.test(job.url) && job.whyFit.length === 3)
+    .filter(job => !isBlockedTargetEmployer(job))
+    .filter(job => hasCurrentOpenCheck(job))
     .filter(job => isAllowedPublishedDate(job.publishedDate, mode))
     .filter(job => job.score >= (mode === "global" ? 7.5 : mode === "swmo" ? 7.2 : 6.5))
     .filter(job => mode !== "linkedin" || isLinkedInJobUrl(job.url))
