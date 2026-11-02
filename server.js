@@ -796,6 +796,112 @@ async function generateMotivationStatement(req, res) {
 }
 
 
+
+const CV_BASE_PROFILE = [
+  "Canonical CV facts. Do not add facts beyond these:",
+  "- Ulas Atilgan; Kapellen, Belgium; Belgian & Turkish citizen; no EU work sponsorship required.",
+  "- Contact: +32 478 66 19 13 | ulascanatilgan@gmail.com | ulascanatilgan.com | linkedin.com/in/ulascntlgn",
+  "- Languages: English Professional; Turkish Native; Dutch B1; French A2.",
+  "- Certifications: CIA, CISA, CIAM, CFE, CFSA, Capital Markets Level 3.",
+  "- Education: M.Sc. Information Technology - Sabanci University (2018); B.Sc. Business Administration - TOBB University (2014); B.Sc. International Relations double major - TOBB University (2015); Exchange Student, International Business - Hogeschool Utrecht (2012).",
+  "- Access Operations Manager - ING Belgium | 2020-Present | Brussels. Cross-functional technology/access operations; application onboarding; access governance; technology integration; platform/SSO migrations; stakeholder alignment; dashboards/documentation; remediation/process improvement; international teams in Belgium, Netherlands and Poland.",
+  "- Business Manager - Hondinn, own venture / boutique dog hotel | 2023-Present | Kapellen. End-to-end venture operations, compliance, customer experience, planning/bookings, suppliers, marketing, financial follow-up, pricing/service quality and practical automation.",
+  "- Corporate Audit Services - ING Belgium | 2019-2020 | Brussels. Assurance/audit workstreams, senior-management findings, recommendations, corrective actions, banking/risk/operations.",
+  "- Project & Control Manager - BPN Payment & E-money Institution | 2017-2019 | Istanbul. Strategic projects, business development, licensing/regulatory preparation, C-level communication, banks, regulators, consultants, PwC/KPMG and auditors.",
+  "- Football Systems Consultant part-time - Hawk-Eye Innovations (Sony) | 2018-2019 | Turkey. Live match-day technology operations under time pressure.",
+  "- Internal Auditor - Akbank / Denizbank | 2014-2017 | Istanbul. Operational, compliance, lending and IT-control reviews; findings, advice, remediation and process improvement.",
+  "- Digital initiatives only when relevant: ECL AI-assisted language app; U-Job AI job-research workflow; UlasTrade AI investment research interface.",
+  "- Additional only when relevant: USTO Interior Finishing / usto.be; independent market analysis / ulascanatilgan.com."
+].join("\n");
+
+function buildCvPrompt(job, note) {
+  const safeNote=String(note||"").trim().slice(0,1200);
+  return [
+    "Tailor Ulas Atilgan's one-page CV to this exact vacancy.",
+    "",
+    "Role: "+job.title,
+    "Company: "+job.company,
+    "Location: "+(job.location||""),
+    "Research URL: "+job.url,
+    "",
+    CV_BASE_PROFILE,
+    "",
+    "USER NOTE",
+    safeNote||"No extra note.",
+    "",
+    "Read the vacancy first. Use the URL only for research; never print a URL, citation, source marker or job-board name in the CV.",
+    "",
+    "RULES",
+    "- Never invent achievements, numbers, team sizes, tools, languages, responsibilities or employers.",
+    "- Keep official employer/job titles intact. You may add one short truthful functional descriptor after the ING title using |.",
+    "- Rewrite/reorder bullets only from the facts above.",
+    "- Include Hondinn only if entrepreneurship, customer/service operations, ownership, SME/startup, pet/animal or hands-on operations strengthens the application.",
+    "- Include Hawk-Eye only if live operations, technology, sports/field work or high-pressure execution is relevant.",
+    "- Include AI/digital projects only when technology/AI/product/prototyping is relevant.",
+    "- Include USTO/interior only for renovation/interior/creative/hands-on roles.",
+    "- No exaggeration. The CV must remain defensible in an interview.",
+    "",
+    "OUTPUT EXACTLY:",
+    "HEADLINE: ...",
+    "PROFILE_1: ...",
+    "PROFILE_2: ...",
+    "PROFILE_3: ...",
+    "SKILLS: skill 1 | skill 2 | skill 3 | skill 4 | skill 5 | skill 6 | skill 7 | skill 8",
+    "ING_DESCRIPTOR: ...",
+    "ING_1: ...",
+    "ING_2: ...",
+    "ING_3: ...",
+    "HONDINN_INCLUDE: YES",
+    "HONDINN_1: ...",
+    "HONDINN_2: ...",
+    "AUDIT_1: ...",
+    "AUDIT_2: ...",
+    "BPN_1: ...",
+    "BPN_2: ...",
+    "HAWKEYE_INCLUDE: YES",
+    "HAWKEYE_1: ...",
+    "INTERNAL_1: ...",
+    "DIGITAL_INCLUDE: YES",
+    "DIGITAL_1: ...",
+    "DIGITAL_2: ...",
+    "ADDITIONAL_INCLUDE: YES",
+    "ADDITIONAL_1: ...",
+    "ADDITIONAL_2: ...",
+    "",
+    "Use YES/NO exactly. Headline concise. Profile bullets <=24 words. ING bullets <=20 words. Keep all content compact and factual."
+  ].join("\n");
+}
+
+function parseCvOutput(text) {
+  const fields={};
+  for(const raw of String(text||"").split("\n")){
+    const line=raw.trim(),i=line.indexOf(":");
+    if(i<=0)continue;
+    fields[line.slice(0,i).trim().toUpperCase()]=cleanGeneratedText(line.slice(i+1).trim());
+  }
+  const skills=String(fields.SKILLS||"").split("|").map(cleanGeneratedLabel).filter(Boolean).slice(0,8);
+  if(!fields.HEADLINE||!fields.PROFILE_1||!fields.ING_1||skills.length<6)throw new Error("Could not create a valid tailored CV.");
+  const yes=k=>String(fields[k]||"").toUpperCase()==="YES";
+  return {
+    headline:cleanGeneratedLabel(fields.HEADLINE),
+    profile:[fields.PROFILE_1,fields.PROFILE_2,fields.PROFILE_3].map(cleanGeneratedText).filter(Boolean).slice(0,3),
+    skills,
+    ingDescriptor:cleanGeneratedLabel(fields.ING_DESCRIPTOR||""),
+    ing:[fields.ING_1,fields.ING_2,fields.ING_3].map(cleanGeneratedText).filter(Boolean).slice(0,3),
+    hondinnInclude:yes("HONDINN_INCLUDE"),
+    hondinn:[fields.HONDINN_1,fields.HONDINN_2].map(cleanGeneratedText).filter(Boolean).slice(0,2),
+    audit:[fields.AUDIT_1,fields.AUDIT_2].map(cleanGeneratedText).filter(Boolean).slice(0,2),
+    bpn:[fields.BPN_1,fields.BPN_2].map(cleanGeneratedText).filter(Boolean).slice(0,2),
+    hawkeyeInclude:yes("HAWKEYE_INCLUDE"),
+    hawkeye:cleanGeneratedText(fields.HAWKEYE_1||""),
+    internal:cleanGeneratedText(fields.INTERNAL_1||""),
+    digitalInclude:yes("DIGITAL_INCLUDE"),
+    digital:[fields.DIGITAL_1,fields.DIGITAL_2].map(cleanGeneratedText).filter(Boolean).slice(0,2),
+    additionalInclude:yes("ADDITIONAL_INCLUDE"),
+    additional:[fields.ADDITIONAL_1,fields.ADDITIONAL_2].map(cleanGeneratedText).filter(Boolean).slice(0,2)
+  };
+}
+
 function buildAskPrompt(url) {
   return `Analyze this exact vacancy for Ulas Atilgan. Use the URL only to inspect the vacancy:
 ${url}
