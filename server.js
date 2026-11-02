@@ -868,7 +868,7 @@ function buildCvPrompt(job, note) {
     "ADDITIONAL_1: ...",
     "ADDITIONAL_2: ...",
     "",
-    "Use YES/NO exactly. Headline concise. Profile bullets <=24 words. ING bullets <=20 words. Keep all content compact and factual."
+    "Use YES/NO exactly. Headline concise. Profile bullets <=24 words. ING bullets <=20 words. DIGITAL and ADDITIONAL lines <=12 words each. Keep all content compact and factual."
   ].join("\n");
 }
 
