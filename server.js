@@ -302,9 +302,9 @@ function buildPrompt(mode, seenUrls) {
 
   const seen = seenUrls.slice(-50).map(normalizeUrl).filter(Boolean);
   const maxAge = mode === "linkedin" ? 7 : 30;
-  const target = mode === "search" ? 20 : mode === "prestige" ? 15 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "creative" || mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
-  const finalTarget = (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
-  const stopAt = (mode === "reasonable" || mode === "prestige") ? 10 : 5;
+  const target = mode === "search" ? 24 : mode === "prestige" ? 15 : mode === "creative" ? 12 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
+  const finalTarget = mode === "search" ? "8-10" : (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
+  const stopAt = (mode === "search" || mode === "reasonable" || mode === "prestige") ? 10 : 5;
 
   const special = mode === "linkedin"
     ? "LINKEDIN: LinkedIn job pages only; <=7 days; final URL must be the LinkedIn vacancy."
@@ -386,7 +386,7 @@ WHY_FIT_1: ...
 WHY_FIT_2: ...
 WHY_FIT_3: ...
 
-For Reasonable and Prestige, return up to 10 verified roles; for every other mode return up to 5. If fewer than 3 roles survive only after fully checking the relevant sources, return those valid roles. If none survive: NO_VERIFIED_JOBS.`;
+For Search, Reasonable and Prestige, return up to 10 verified roles; for every other mode return up to 5. If fewer than 3 roles survive only after fully checking the relevant sources, return those valid roles. If none survive: NO_VERIFIED_JOBS.`;
 }
 
 function parseVerifiedJobs(text) {
