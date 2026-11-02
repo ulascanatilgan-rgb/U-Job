@@ -902,6 +902,183 @@ function parseCvOutput(text) {
   };
 }
 
+
+let cvPhotoCache=null;
+async function loadCvPhoto(){
+  if(cvPhotoCache)return cvPhotoCache;
+  const parts=[];
+  for(let i=1;i<=4;i++)parts.push(await readFile(path.join(__dirname,"assets","cv_photo_"+i+".txt"),"utf8"));
+  const image=Buffer.from(parts.join("").replace(/\s+/g,""),"base64");
+  if(image.length<1000||image[0]!==0xFF||image[1]!==0xD8)throw new Error("CV photo asset is invalid.");
+  cvPhotoCache=image;
+  return image;
+}
+
+function buildBinaryPdf(objects){
+  const header=Buffer.from("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n","latin1");
+  const chunks=[header],offsets=[0];
+  let offset=header.length;
+  for(let i=1;i<objects.length;i++){
+    const pre=Buffer.from(String(i)+" 0 obj\n","latin1");
+    const body=Buffer.isBuffer(objects[i])?objects[i]:Buffer.from(String(objects[i]),"latin1");
+    const post=Buffer.from("\nendobj\n","latin1");
+    offsets[i]=offset;chunks.push(pre,body,post);offset+=pre.length+body.length+post.length;
+  }
+  const xrefOffset=offset;
+  let xref="xref\n0 "+objects.length+"\n0000000000 65535 f \n";
+  for(let i=1;i<objects.length;i++)xref+=String(offsets[i]).padStart(10,"0")+" 00000 n \n";
+  xref+="trailer\n<< /Size "+objects.length+" /Root 1 0 R >>\nstartxref\n"+xrefOffset+"\n%%EOF";
+  chunks.push(Buffer.from(xref,"latin1"));
+  return Buffer.concat(chunks);
+}
+
+function buildTailoredCvPdf(cv,photo){
+  const W=595.28,H=841.89,cmds=[];
+  const rgb=c=>c.join(" ");
+  const text=(value,x,y,size=8,bold=false,color=[0.13,0.15,0.18])=>{
+    cmds.push("BT /F"+(bold?2:1)+" "+size.toFixed(1)+" Tf "+rgb(color)+" rg 1 0 0 1 "+x.toFixed(1)+" "+y.toFixed(1)+" Tm ("+pdfEscape(value)+") Tj ET");
+  };
+  const fill=(x,y,w,h,c)=>cmds.push(rgb(c)+" rg "+x+" "+y+" "+w+" "+h+" re f");
+  const line=(x1,y1,x2,y2,c=[0.05,0.42,0.82],width=.7)=>cmds.push(rgb(c)+" RG "+width+" w "+x1+" "+y1+" m "+x2+" "+y2+" l S");
+  const wrap=(value,chars)=>wrapPdfText(value,chars);
+  const bullet=(value,x,y,chars,size=7.45,color=[0.28,0.30,0.34])=>{
+    text("-",x,y,size,true,[0.05,0.42,0.82]);
+    const lines=wrap(value,chars).slice(0,3);
+    let yy=y;
+    for(const ln of lines){text(ln,x+9,yy,size,false,color);yy-=9.0;}
+    return yy;
+  };
+  const section=(label,x,y,w)=>{
+    text(label,x,y,8.55,true,[0.10,0.22,0.38]);
+    line(x,y-4,x+w,y-4,[0.05,0.42,0.82],.8);
+    return y-14.5;
+  };
+  const sideHeader=(label,y)=>{
+    text(label,37,y,8.6,true,[1,1,1]);
+    line(37,y-5,151,y-5,[0.55,0.67,0.80],.55);
+    return y-16.5;
+  };
+  const sideLine=(value,y,size=7.0,bold=false)=>{
+    text(value,37,y,size,bold,[0.95,0.97,1]);
+    return y-9.9;
+  };
+
+  fill(28,24,150,794,[0.15,0.27,0.44]);
+  cmds.push("q 105 0 0 101.6 50 682 cm /Im1 Do Q");
+
+  let sy=666;
+  sy=sideHeader("CONTACT",sy);
+  for(const v of ["Kapellen, Belgium","+32 478 66 19 13","ulascanatilgan@gmail.com","ulascanatilgan.com","linkedin.com/in/ulascntlgn"])sy=sideLine(v,sy,6.8);
+  sy-=4;sy=sideHeader("LANGUAGES",sy);
+  for(const v of ["English - Professional","Turkish - Native","Dutch - B1","French - A2"])sy=sideLine(v,sy);
+  sy-=3;sy=sideHeader("CITIZENSHIP",sy);
+  sy=sideLine("Belgian & Turkish",sy);sy=sideLine("No work sponsorship required (EU)",sy,6.65);
+  sy-=3;sy=sideHeader("CERTIFICATIONS",sy);
+  for(const v of ["CIA - Certified Internal Auditor","CISA - Information Systems Auditor","CIAM - Identity & Access Manager","CFE - Certified Fraud Examiner","CFSA - Financial Services Auditor","Capital Markets Level 3"])sy=sideLine(v,sy,6.4);
+  sy-=3;sy=sideHeader("CORE SKILLS",sy);
+  for(const v of cv.skills.slice(0,8))sy=sideLine(v,sy,6.65);
+
+  if(cv.digitalInclude&&cv.digital.length&&sy>120){
+    sy-=3;sy=sideHeader("DIGITAL",sy);
+    for(const v of cv.digital.slice(0,2))for(const ln of wrap(v,29).slice(0,2))sy=sideLine(ln,sy,6.25);
+  }
+  if(cv.additionalInclude&&cv.additional.length&&sy>82){
+    sy-=3;sy=sideHeader("ADDITIONAL",sy);
+    for(const v of cv.additional.slice(0,2))for(const ln of wrap(v,29).slice(0,2))sy=sideLine(ln,sy,6.25);
+  }
+
+  const x=194,right=564,rw=right-x;
+  text("ULAS ATILGAN",x,790,19,true,[0.10,0.22,0.38]);
+  text(cv.headline,x,770,10,false,[0.02,0.40,0.80]);
+
+  let y=750;
+  y=section("PROFILE",x,y,rw);
+  for(const p of cv.profile.slice(0,3)){y=bullet(p,x+4,y,72,7.45);y-=1.5;}
+
+  y-=1;y=section("PROFESSIONAL EXPERIENCE",x,y,rw);
+  const role=(titleLine,dateLine,bullets)=>{
+    text(titleLine,x,y,8.5,true,[0.08,0.09,0.11]);y-=10.5;
+    text(dateLine,x,y,7.0,false,[0.02,0.40,0.80]);y-=9.5;
+    for(const b of bullets){y=bullet(b,x+4,y,73,7.1);y-=.5;}
+    y-=3.5;
+  };
+
+  const ingTitle="Access Operations Manager - ING Belgium"+(cv.ingDescriptor?" | "+cv.ingDescriptor:"");
+  role(ingTitle,"2020 - Present | Brussels, Belgium",cv.ing.slice(0,3));
+  if(cv.hondinnInclude&&cv.hondinn.length)role("Business Manager - Hondinn (own venture) | boutique dog hotel","2023 - Present | Kapellen, Belgium",cv.hondinn.slice(0,2));
+  role("Corporate Audit Services - ING Belgium","2019 - 2020 | Brussels, Belgium",cv.audit.length?cv.audit.slice(0,2):["Coordinated assurance workstreams, senior-stakeholder findings and remediation across banking and operational functions."]);
+  role("Project & Control Manager - BPN Payment & E-money Institution","2017 - 2019 | Istanbul, Turkey",cv.bpn.slice(0,2));
+  if(cv.hawkeyeInclude&&cv.hawkeye)role("Football Systems Consultant (part-time) - Hawk-Eye Innovations (Sony)","2018 - 2019 | Turkey",[cv.hawkeye]);
+  role("Internal Auditor - Akbank / Denizbank","2014 - 2017 | Istanbul, Turkey",[cv.internal||"Delivered operational, compliance, lending and IT-control reviews; documented findings and tracked remediation."]);
+
+  y=Math.max(y-1,82);
+  y=section("EDUCATION",x,y,rw);
+  const edu=[
+    "M.Sc. Information Technology - Sabanci University, Istanbul (2018)",
+    "B.Sc. Business Administration - TOBB University, Ankara (2014)",
+    "B.Sc. International Relations (Double Major) - TOBB University, Ankara (2015)",
+    "Exchange Student, International Business - Hogeschool Utrecht (2012)"
+  ];
+  for(const e of edu){text(e,x,y,7.05,e.startsWith("M.Sc.")||e.startsWith("B.Sc."),[0.16,0.17,0.19]);y-=9.0;}
+  if(y<34)throw new Error("Tailored CV content is too long for the one-page format.");
+
+  const stream=cmds.join("\n");
+  const imageObject=Buffer.concat([
+    Buffer.from("<< /Type /XObject /Subtype /Image /Width 344 /Height 333 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length "+photo.length+" >>\nstream\n","latin1"),
+    photo,
+    Buffer.from("\nendstream","latin1")
+  ]);
+  const contentObject="<< /Length "+Buffer.byteLength(stream,"latin1")+" >>\nstream\n"+stream+"\nendstream";
+  return buildBinaryPdf([
+    null,
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 "+W.toFixed(2)+" "+H.toFixed(2)+"] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> /XObject << /Im1 6 0 R >> >> /Contents 7 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>",
+    imageObject,
+    contentObject
+  ]);
+}
+
+function safeCvFilename(job){
+  const slug=[job.company,job.title].filter(Boolean).join("_").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,90);
+  return "Ulas_Atilgan_"+(slug||"Tailored")+"_CV.pdf";
+}
+
+async function generateTailoredCv(req,res){
+  if(!OPENAI_API_KEY)return sendJson(res,503,{error:"OPENAI_API_KEY is not configured in Railway."});
+  const body=await readJson(req),rawJob=body?.job||{};
+  const job={
+    title:cleanGeneratedLabel(String(rawJob.title||"").slice(0,180)),
+    company:cleanGeneratedLabel(String(rawJob.company||"").slice(0,140)),
+    location:cleanGeneratedLabel(String(rawJob.location||"").slice(0,140)),
+    url:normalizeUrl(rawJob.url),
+    publishedDate:String(rawJob.publishedDate||"").trim().slice(0,20)
+  };
+  const note=String(body?.note||"").trim().slice(0,1200);
+  if(!job.title||!job.company||!/^https?:\/\//i.test(job.url))return sendJson(res,400,{error:"A valid watched vacancy is required."});
+  try{
+    const data=await openAIRequest("https://api.openai.com/v1/responses",{
+      method:"POST",
+      body:JSON.stringify({
+        model:OPENAI_MODEL,
+        store:false,
+        tools:[{type:"web_search",search_context_size:"low"}],
+        tool_choice:"required",
+        input:buildCvPrompt(job,note),
+        max_output_tokens:2200
+      })
+    });
+    const cv=parseCvOutput(extractOutputText(data));
+    const photo=await loadCvPhoto();
+    return sendPdf(res,buildTailoredCvPdf(cv,photo),safeCvFilename(job));
+  }catch(error){
+    console.error("U-Job CV generation error:",error);
+    return sendJson(res,502,{error:error?.message||"Could not generate tailored CV."});
+  }
+}
+
 function buildAskPrompt(url) {
   return `Analyze this exact vacancy for Ulas Atilgan. Use the URL only to inspect the vacancy:
 ${url}
@@ -1181,6 +1358,10 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/ask/analyze") {
       return await analyzeAskLink(req, res);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/cv/generate") {
+      return await generateTailoredCv(req, res);
     }
 
     if (req.method === "POST" && url.pathname === "/api/ms/generate") {
