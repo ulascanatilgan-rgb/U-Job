@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.3.1-token-budget-fix";
+const APP_VERSION = "4.3.2-remove-max-output-tokens";
 
 const MODES = {
   search: {
@@ -837,8 +837,7 @@ async function generateMotivationStatement(req, res) {
         store: false,
         tools: [{ type: "web_search", search_context_size: "low" }],
         tool_choice: "required",
-        input: buildMsPrompt(job, note),
-        max_output_tokens: 1800
+        input: buildMsPrompt(job, note)
       })
     });
     const ms = parseMsOutput(extractOutputText(data));
@@ -1121,8 +1120,7 @@ async function generateTailoredCv(req,res){
         store:false,
         tools:[{type:"web_search",search_context_size:"low"}],
         tool_choice:"required",
-        input:buildCvPrompt(job,note),
-        max_output_tokens:2200
+        input:buildCvPrompt(job,note)
       })
     });
     const cv=parseCvOutput(extractOutputText(data));
@@ -1209,8 +1207,7 @@ async function analyzeAskLink(req, res) {
         store: false,
         tools: [{ type: "web_search", search_context_size: "low" }],
         tool_choice: "required",
-        input: buildAskPrompt(url),
-        max_output_tokens: 900
+        input: buildAskPrompt(url)
       })
     });
     const job = parseAskOutput(extractOutputText(data), url);
@@ -1257,43 +1254,28 @@ async function startSearch(req, res) {
   const seenUrls = Array.isArray(body?.seenUrls) ? body.seenUrls.map(String) : [];
   const strictPrompt = buildStrictPrompt(buildPrompt(mode, seenUrls), mode);
 
-  const runBackgroundSearch = async (tokenBudget) => openAIRequest("https://api.openai.com/v1/responses", {
-    method: "POST",
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      background: true,
-      store: true,
-      tools: [{
-        type: "web_search",
-        search_context_size: "medium",
-        user_location: {
-          type: "approximate",
-          country: "BE",
-          city: "Antwerp",
-          region: "Flanders",
-          timezone: "Europe/Brussels"
-        }
-      }],
-      tool_choice: "required",
-      input: strictPrompt,
-      max_output_tokens: tokenBudget
-    })
-  });
-
-  const primaryBudget = mode === "search" ? 3900 : mode === "prestige" ? 3900 : mode === "reasonable" ? 3600 : 3200;
-
   try {
-    let data;
-    try {
-      data = await runBackgroundSearch(primaryBudget);
-    } catch (error) {
-      if (/max_output_tokens/i.test(String(error?.message || "")) && primaryBudget > 3200) {
-        console.warn("U-Job token budget rejected; retrying with 3200.", { mode, primaryBudget });
-        data = await runBackgroundSearch(3200);
-      } else {
-        throw error;
-      }
-    }
+    const data = await openAIRequest("https://api.openai.com/v1/responses", {
+      method: "POST",
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        background: true,
+        store: true,
+        tools: [{
+          type: "web_search",
+          search_context_size: "medium",
+          user_location: {
+            type: "approximate",
+            country: "BE",
+            city: "Antwerp",
+            region: "Flanders",
+            timezone: "Europe/Brussels"
+          }
+        }],
+        tool_choice: "required",
+        input: strictPrompt
+      })
+    });
 
     if (!data?.id) {
       return sendJson(res, 502, { error: "Search service did not return a background response ID." });
@@ -1307,10 +1289,7 @@ async function startSearch(req, res) {
     });
   } catch (error) {
     console.error("U-Job start search error:", error);
-    const message = /max_output_tokens/i.test(String(error?.message || ""))
-      ? "Search output budget was rejected by the model. Please run Search again."
-      : (error?.message || "Could not start search.");
-    return sendJson(res, 502, { error: message });
+    return sendJson(res, 502, { error: error?.message || "Could not start search." });
   }
 }
 
