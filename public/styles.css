@@ -333,3 +333,18 @@ body[data-mode="search"] .run{
 
 .application-note-label{margin-top:9px;font-size:9px;font-weight:700;letter-spacing:.01em;color:#717783}
 .ms-note{line-height:1.42;min-height:66px}
+
+.format-inline{
+  flex:0 0 52px;width:52px;height:52px;border-radius:999px;
+  border:1px solid rgba(35,79,115,.16);
+  background:linear-gradient(145deg,#eef4f8,#e3edf4);color:#274e70;
+  font-size:9.4px;font-weight:760;letter-spacing:.01em;cursor:pointer;
+  box-shadow:0 8px 20px rgba(35,79,115,.10),inset 0 1px 0 rgba(255,255,255,.9);
+  transition:transform .14s ease,box-shadow .14s ease
+}
+.format-inline:active{transform:scale(.97)}
+.format-inline:disabled{opacity:.48;cursor:default}
+@media(max-width:520px){
+  .actions-mode{width:auto;flex:1 1 auto}
+  .format-inline{flex-basis:50px;width:50px;height:50px}
+}
