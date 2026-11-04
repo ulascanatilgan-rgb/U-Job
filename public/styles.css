@@ -330,3 +330,6 @@ body[data-mode="search"] .run{
 .doc-buttons{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .update-cv{border:1px solid rgba(19,70,112,.11);background:linear-gradient(180deg,#eef5fb,#e7f0f8);color:#274e70;border-radius:999px;min-height:34px;padding:0 14px;font-size:10px;font-weight:690;cursor:pointer;box-shadow:0 5px 14px rgba(20,50,80,.045),inset 0 1px 0 rgba(255,255,255,.9)}
 .update-cv:disabled{opacity:.48;cursor:default}
+
+.application-note-label{margin-top:9px;font-size:9px;font-weight:700;letter-spacing:.01em;color:#717783}
+.ms-note{line-height:1.42;min-height:66px}
