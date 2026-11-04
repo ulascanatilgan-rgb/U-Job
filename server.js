@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.5.0-reasonable-guaranteed-fill";
+const APP_VERSION = "4.6.0-ms-cv-polish";
 
 const MODES = {
   search: {
@@ -666,7 +666,7 @@ const MS_PROFILE = `Use only these established candidate facts:
 
 function buildMsPrompt(job, note) {
   const safeNote = String(note || "").trim().slice(0, 1200);
-  return `Write a concise one-page MSVersion1 motivation statement for this exact vacancy.
+  return `Write a concise one-page Motivation Statements document for this exact vacancy.
 
 VACANCY TO RESEARCH
 Role: ${job.title}
@@ -676,44 +676,59 @@ Research URL: ${job.url}
 
 ${MS_PROFILE}
 
-USER NOTE
+USER NOTE - PRIORITY INSTRUCTION
 ${safeNote || "No extra note."}
 
+USER NOTE RULE
+The user may write this note in Turkish or English. Understand its intent and actively use it when factually supported. If the user asks to emphasise, omit or mention a topic, follow that instruction unless it would invent experience or contradict the vacancy.
+
 RESEARCH FIRST
-Read the current vacancy and identify its actual responsibilities, must-haves and working style. Use the URL only for research. NEVER print, mention, cite or reproduce the URL, website, source link or citation in the motivation statement.
+Read the current vacancy and identify its actual responsibilities, must-haves, working style and business context. Use the URL only for research. NEVER print, mention, cite or reproduce the URL, website, source link or citation in the document.
 
-WRITING METHOD
-Create one short intro + exactly 7 points. Every point must connect ONE concrete employer need from the vacancy to ONE concrete candidate fact. Do not write generic personality claims without evidence.
+CONTENT
+Create one concise intro + exactly 7 points. Write from the candidate's perspective, directly and concretely.
+Do NOT structure points as "you need X, I have Y", "the role needs", "you are looking for", or other recruiter-template language.
+Start from what I bring, what I have done, why that experience is relevant, and what value I can add in this company.
 
-Across the 7 points, cover these themes when compatible with the vacancy:
-1. Direct match to the role's core operational/business responsibility.
-2. Operational ownership, coordination and stakeholder management.
-3. Numbers, analytics, reporting, reconciliation, controls or data-driven judgement.
-4. Tech-savvy/AI/automation mindset and MSc IT/ML.
-5. Existing international English-speaking banking environment and cross-functional communication.
-6. Hondinn/entrepreneurial hands-on ownership, customer focus and practical execution.
-7. Belgian/EU citizenship, Belgium base and no visa sponsorship requirement.
+Across the 7 points, use the most vacancy-relevant combination of:
+1. Operational ownership and ability to run/co-ordinate work end-to-end.
+2. Analytical confidence with numbers, reporting, controls, data and structured decisions.
+3. Technology fluency, fast application/tool learning, AI/automation mindset and MSc IT background.
+4. Stakeholder management across business, IT, risk, support teams, senior management and external parties.
+5. 12+ years across banking/fintech/audit/control giving disciplined, structured execution and regulated-environment judgement.
+6. A role-specific differentiator where relevant: Hondinn entrepreneurship/customer operations; UlasTrade/markets; AI apps; USTO/interior; fraud/control; IAM/security; International Relations; certifications.
+7. Local availability: based in Kapellen, already established and working in Belgium, Belgian/EU citizen, no visa sponsorship required.
 
-Use banking/fintech, fraud/control, IAM/security, payment-process, certifications, International Relations, UlasTrade or other facts only where the vacancy makes them relevant.
+POINT-TO-POINT MATCH
+Each point must connect a real candidate capability to a real part of the vacancy. Prefer statements such as:
+- "I have managed..."
+- "I bring..."
+- "My experience in ... gives me..."
+- "I can contribute by..."
+- "I would be able to..."
+- "This background fits the role because..."
+Do not copy these mechanically; vary the language naturally.
 
 STYLE
-- First person natural English. Short, confident, factual and human.
-- Mention only the company name and position title where useful. Never show a URL, domain, hyperlink, citation, source marker or job-board name.
-- Paraphrase the employer's requirement; do not copy long vacancy wording.
-- Make the match concrete: "you need X; I have done Y" logic without sounding formulaic.
+- First-person natural English. Direct, mature, specific and human.
+- Avoid generic HR phrases, inflated enthusiasm and empty adjectives.
+- Point titles must be short capability/value labels, e.g. "Operational ownership", "Analytical judgement", "Technology fluency", not employer-needs phrasing.
+- Mention the company/role only where it improves specificity.
+- Never show a URL, domain, hyperlink, citation, source marker or job-board name.
 - No invented achievements, percentages, team sizes, software, languages or responsibilities.
-- Intro <=40 words. Each point <=34 words, ideally one compact sentence or two very short sentences.
+- Intro <=45 words. Each point 28-42 words: substantial enough to fill the page, but concise.
 - No Dear/Sincerely/contact details/closing paragraph.
+- Always include local availability/no sponsorship in one of the seven points.
 
 OUTPUT EXACTLY:
 INTRO: ...
 
 ---POINT---
-NUMBER: 01
+NUMBER: 1
 TITLE: ...
 TEXT: ...
 
-Repeat through NUMBER: 07. Plain text only. No links, citations or markdown.`;
+Repeat through NUMBER: 7. Plain text only. No links, citations or markdown.`;
 }
 
 function parseMsOutput(text) {
