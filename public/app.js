@@ -318,6 +318,17 @@ function cvFilename(job){
   const slug=[job.company,job.title].filter(Boolean).join("_").replace(/[^A-Za-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,90);
   return "Ulas_Atilgan_"+(slug||"Tailored")+"_CV.pdf";
 }
+function downloadPdfBlob(blob,filename){
+  const blobUrl=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=blobUrl;
+  a.download=filename;
+  a.style.display="none";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(blobUrl),120000);
+}
 async function updateCv(key,button){
   const job=state.actions?.[key];
   if(!job||cvBusy.has(key))return;
@@ -326,14 +337,18 @@ async function updateCv(key,button){
   const statusEl=card?.querySelector("[data-ms-status]");
   const note=noteEl?.value||state.msNotes?.[key]||"";
   if(!state.msNotes)state.msNotes={};
-  state.msNotes[key]=note;saveState();
+  state.msNotes[key]=note;
+  saveState();
 
-  cvBusy.add(key);button.disabled=true;button.textContent="Updating CV…";
-  if(statusEl)statusEl.textContent="Reading the vacancy and tailoring your one-page CV…";
-  let preview=null;try{preview=window.open("","_blank")}catch{}
+  cvBusy.add(key);
+  button.disabled=true;
+  button.textContent="Updating CV…";
+  if(statusEl)statusEl.textContent="Reading the vacancy and tailoring your CV from the saved base version…";
   try{
     const response=await apiFetch("/api/cv/generate",{
-      method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({job,note})
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({job,note})
     },90000);
     if(!response.ok){
       const data=await response.json().catch(()=>({}));
@@ -341,19 +356,17 @@ async function updateCv(key,button){
     }
     const blob=await response.blob();
     if(blob.type!=="application/pdf")throw new Error("The server did not return a PDF.");
-    const blobUrl=URL.createObjectURL(blob);
-    if(preview){preview.location.href=blobUrl}else{
-      const a=document.createElement("a");a.href=blobUrl;a.download=cvFilename(job);document.body.appendChild(a);a.click();a.remove();
-    }
-    if(statusEl)statusEl.textContent="Tailored CV ready.";
-    setTimeout(()=>URL.revokeObjectURL(blobUrl),120000);
+    downloadPdfBlob(blob,cvFilename(job));
+    if(statusEl)statusEl.textContent="Tailored CV downloaded.";
   }catch(error){
-    try{preview?.close()}catch{}
     if(statusEl)statusEl.textContent=error?.name==="AbortError"?"CV generation took too long. Try again.":(error.message||"Could not generate tailored CV.");
   }finally{
-    cvBusy.delete(key);button.disabled=false;button.textContent="Update CV";
+    cvBusy.delete(key);
+    button.disabled=false;
+    button.textContent="Update CV";
   }
 }
+
 async function generateMs(key,button){
   const job=state.actions?.[key];
   if(!job||msBusy.has(key))return;
@@ -368,34 +381,23 @@ async function generateMs(key,button){
   msBusy.add(key);
   button.disabled=true;
   button.textContent="Generating PDF…";
-  if(statusEl)statusEl.textContent="Reading the vacancy and tailoring 7 points…";
+  if(statusEl)statusEl.textContent="Reading the vacancy, your note and tailoring 7 direct points…";
 
-  let preview=null;
-  try{preview=window.open("","_blank");}catch{}
   try{
     const response=await apiFetch("/api/ms/generate",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({job,note})
     },90000);
-
     if(!response.ok){
       const data=await response.json().catch(()=>({}));
-      throw new Error(data.error||"Could not generate motivation statement.");
+      throw new Error(data.error||"Could not generate motivation statements.");
     }
     const blob=await response.blob();
     if(blob.type!=="application/pdf")throw new Error("The server did not return a PDF.");
-    const blobUrl=URL.createObjectURL(blob);
-    if(preview){
-      preview.location.href=blobUrl;
-    }else{
-      const a=document.createElement("a");
-      a.href=blobUrl;a.download=msFilename(job);document.body.appendChild(a);a.click();a.remove();
-    }
-    if(statusEl)statusEl.textContent="PDF ready.";
-    setTimeout(()=>URL.revokeObjectURL(blobUrl),120000);
+    downloadPdfBlob(blob,msFilename(job));
+    if(statusEl)statusEl.textContent="Motivation Statements downloaded.";
   }catch(error){
-    try{preview?.close()}catch{}
     if(statusEl)statusEl.textContent=error?.name==="AbortError"?"Generation took too long. Try again.":(error.message||"Could not generate PDF.");
   }finally{
     msBusy.delete(key);
@@ -403,6 +405,7 @@ async function generateMs(key,button){
     button.textContent="Generate MS";
   }
 }
+
 function bindMsControls(root){
   root.querySelectorAll("textarea[data-ms-note-key]").forEach(area=>{
     area.addEventListener("input",()=>{
@@ -483,7 +486,8 @@ function renderActionResults(jobs){
       <div class="job-meta">${esc(job.company)} · ${esc(job.location)}${job.publishedDate?` · Published ${esc(job.publishedDate)}`:""}</div>
       <div class="ms-tools">
         <div class="doc-buttons"><button class="generate-ms" type="button" data-generate-ms="${esc(key)}"${busy?" disabled":""}>${busy?"Generating PDF…":"Generate MS"}</button><button class="update-cv" type="button" data-update-cv="${esc(key)}"${cvBusyNow?" disabled":""}>${cvBusyNow?"Updating CV…":"Update CV"}</button></div>
-        <textarea class="ms-note" data-ms-note-key="${esc(key)}" maxlength="1200" rows="2" placeholder="MS note — e.g. emphasize AI, mention investments, do not mention Hondinn…">${esc(note)}</textarea>
+        <div class="application-note-label">Application note · used for both MS and CV</div>
+        <textarea class="ms-note" data-ms-note-key="${esc(key)}" maxlength="1200" rows="3" placeholder="Türkçe veya English yazabilirsin — örn. AI tarafımı öne çıkar, Hondinn'den bahsetme, investments ilgimi ekle…">${esc(note)}</textarea>
         <div class="ms-status" data-ms-status aria-live="polite"></div>
       </div>
       ${appliedControl(job,job.sourceMode||"",false)}
@@ -716,7 +720,7 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=53",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=54",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.primarySearch?.addEventListener("click",showSearchHome);
 els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
