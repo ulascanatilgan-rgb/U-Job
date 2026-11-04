@@ -1,5 +1,7 @@
-const MODES={search:{title:"Search",hint:"Best 12 opportunities across every U-Job theme, ranked together."},reasonable:{title:"Reasonable",hint:"Fintech-first Business Operations & Strategy roles — up to 10 verified matches."},creative:{title:"Creative",hint:"Interior, renovation, finishing, workshop and hands-on project roles."},dogs:{title:"Dogs",hint:"Dog, pet and animal-sector roles where Hondinn gives you a real edge."},kapellen:{title:"Kapellen",hint:"Strong-fit jobs close to Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},startup:{title:"Startup",hint:"High-potential Belgian tech startups and scale-ups, Antwerp first."},familyoffice:{title:"Family O.",hint:"Family offices, family capital, owner offices and boutique investment/operations roles."},investment:{title:"Investment",hint:"Investment, wealth, research and economics roles matching your business + analytics + tech profile."},fintech:{title:"Fintech",hint:"Belgium fintech roles matched to your banking, operations and tech profile."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Power-track institutions, defence, EU/NATO, policy and international influence — up to 10 verified roles."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
+const MODES={search:{title:"Search",hint:"Best 12 opportunities across every U-Job theme, ranked together."},reasonable:{title:"Reasonable",hint:"Realistic next-step roles across fintech, startups, investment/product, transformation and operations — aiming for 5-10 verified matches."},creative:{title:"Creative",hint:"Interior, renovation, finishing, workshop and hands-on project roles."},dogs:{title:"Dogs",hint:"Dog, pet and animal-sector roles where Hondinn gives you a real edge."},kapellen:{title:"Kapellen",hint:"Strong-fit jobs close to Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},startup:{title:"Startup",hint:"High-potential Belgian tech startups and scale-ups, Antwerp first."},familyoffice:{title:"Family O.",hint:"Family offices, family capital, owner offices and boutique investment/operations roles."},investment:{title:"Investment",hint:"Investment, wealth, research and economics roles matching your business + analytics + tech profile."},fintech:{title:"Fintech",hint:"Belgium fintech roles matched to your banking, operations and tech profile."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Power-track institutions, defence, EU/NATO, policy and international influence — up to 10 verified roles."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
 const STORAGE_KEY="ujob:data";const SEARCH_TARGET=12;const SEARCH_FILL_MAX_ROUNDS=4;const DETAIL_MIN_TARGET=3;const DETAIL_FILL_MAX_ROUNDS=3;let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;let searchFillRound=0;let searchSessionJobs=[];const detailFillRounds={};const detailSessionJobs={};const msBusy=new Set();const cvBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",familyoffice:"",investment:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,familyoffice:null,investment:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
+function detailMinTargetFor(mode){return mode==="reasonable"?5:DETAIL_MIN_TARGET}
+function detailFillMaxRoundsFor(mode){return mode==="reasonable"?5:DETAIL_FILL_MAX_ROUNDS}
 const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory"),primarySearch:$("primarySearch"),primaryDetails:$("primaryDetails"),detailsPanel:$("detailsPanel")};
 function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}function isBlockedTarget(job){
   const company=String(job?.company||"").trim();
@@ -113,7 +115,7 @@ function collectTodayVerifiedDetailJobs(){
   return mergeSearchJobs(jobs);
 }
 const RELATED_MODE_POOLS={
-  reasonable:["fintech","startup","investment","corporate","ai","highpaid","linkedin","search"],
+  reasonable:["fintech","startup","investment","familyoffice","corporate","ai","highpaid","kapellen","linkedin","search"],
   fintech:["reasonable","startup","investment","corporate","ai","search"],
   startup:["reasonable","fintech","ai","highpaid","creative","search"],
   investment:["familyoffice","fintech","corporate","reasonable","highpaid","search"],
@@ -170,7 +172,7 @@ function collectTodayVerifiedRelatedJobs(mode){
 }
 function mergeDetailJobs(mode,...lists){
   const all=mergeSearchJobs(...lists);
-  const floor=(mode==="global"?7.5:mode==="swmo"?7.2:6.2);
+  const floor=(mode==="global"?7.5:mode==="swmo"?7.2:mode==="reasonable"?6.0:6.2);
   return all.filter(job=>Number(job.score||0)>=floor).slice(0,(mode==="reasonable"||mode==="prestige")?10:5);
 }
 
@@ -565,9 +567,11 @@ function completeModeSearch(mode,data){
     clearPoll(mode);
 
     const round=Number(detailFillRounds[mode]||0);
-    if(jobs.length<DETAIL_MIN_TARGET&&round<DETAIL_FILL_MAX_ROUNDS){
+    const minTarget=detailMinTargetFor(mode);
+    const maxRounds=detailFillMaxRoundsFor(mode);
+    if(jobs.length<minTarget&&round<maxRounds){
       detailFillRounds[mode]=round+1;
-      modeStatus[mode]=String(jobs.length)+" verified so far. Expanding related sources…";
+      modeStatus[mode]=String(jobs.length)+" verified so far. Expanding related sources"+(mode==="reasonable"?" across fintech, startup, investment, transformation and local roles":"")+"…";
       if(activeView===mode)render();
       setTimeout(()=>startModeSearch(mode,0),150);
       return;
@@ -590,7 +594,7 @@ function completeModeSearch(mode,data){
     ?String(targetMax)+" verified matches."
     :jobs.length>0
       ?String(jobs.length)+" verified matches found after full search expansion."
-      :(mode==="search"?"Search expansion completed without enough verified roles.":"Full expanded search completed; no role passed every hard filter.");
+      :(mode==="search"?"Search expansion completed without enough verified roles.":mode==="reasonable"?"Reasonable exhausted all expanded waves; no current role passed the hard eligibility filters.":"Full expanded search completed; no role passed every hard filter.");
 
   if(activeView===mode)render();
 }
@@ -712,7 +716,7 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=52",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=53",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.primarySearch?.addEventListener("click",showSearchHome);
 els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
