@@ -381,7 +381,7 @@ SEARCH PLAN
 - Verify EACH final role by RE-OPENING the exact vacancy in this run: exact YYYY-MM-DD publication date, role still visibly open, a live application path/button or explicit current application instruction, English sufficient, no mandatory extra language, real profile fit.
 - Reject stale/closed/expired/cached-only/search-index-only listings, generic careers pages, guessed dates, missing application paths, major must-have gaps, junior/repetitive roles and irrelevant matches.
 - Prefer unseen roles. Seen URLs may be reused only if still live and needed for a strong result set.
-- Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : "6.5"}.
+- Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : mode === "search" ? "6.2" : "6.5"}.
 - HARD-MATCH RULE for every mode: read the must-have experience requirements, not only the title. If the vacancy requires multiple years of specific domain experience the candidate clearly does not possess, REJECT it even if the employer/sector is attractive. Transferable banking/operations/analytics experience counts only when the vacancy wording reasonably allows adjacent/relevant experience.
 - For accepted roles output MATCH_CHECK: NO_HARD_GAP | short explanation of why the mandatory experience requirements are realistically met or transferable.
 - Prestige mode: candidate is Belgian/EU citizen and age 35. Check explicit age, nationality, clearance and status requirements. Do not reject Belgian/EU nationality requirements. Reject age-capped programmes if 35 is outside the allowed range. Output AGE_CHECK with the eligibility conclusion.
@@ -596,7 +596,7 @@ function finalizeJobsFromResponse(data, mode = "") {
     .filter(job => hasCurrentOpenCheck(job))
     .filter(job => hasNoHardExperienceGap(job))
     .filter(job => isAllowedPublishedDate(job.publishedDate, mode))
-    .filter(job => job.score >= (mode === "global" ? 7.5 : mode === "swmo" ? 7.2 : 6.5))
+    .filter(job => job.score >= (mode === "global" ? 7.5 : mode === "swmo" ? 7.2 : mode === "search" ? 6.2 : 6.5))
     .filter(job => mode !== "linkedin" || isLinkedInJobUrl(job.url))
     .filter(job => mode !== "global" || hasVerifiedEuropeRemote(job))
     .filter(job => mode !== "swmo" || hasRealisticSwmoMobility(job))
