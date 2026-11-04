@@ -1,5 +1,5 @@
 const MODES={search:{title:"Search",hint:"Best 12 opportunities across every U-Job theme, ranked together."},reasonable:{title:"Reasonable",hint:"Fintech-first Business Operations & Strategy roles — up to 10 verified matches."},creative:{title:"Creative",hint:"Interior, renovation, finishing, workshop and hands-on project roles."},dogs:{title:"Dogs",hint:"Dog, pet and animal-sector roles where Hondinn gives you a real edge."},kapellen:{title:"Kapellen",hint:"Strong-fit jobs close to Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},startup:{title:"Startup",hint:"High-potential Belgian tech startups and scale-ups, Antwerp first."},familyoffice:{title:"Family O.",hint:"Family offices, family capital, owner offices and boutique investment/operations roles."},investment:{title:"Investment",hint:"Investment, wealth, research and economics roles matching your business + analytics + tech profile."},fintech:{title:"Fintech",hint:"Belgium fintech roles matched to your banking, operations and tech profile."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Power-track institutions, defence, EU/NATO, policy and international influence — up to 10 verified roles."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
-const STORAGE_KEY="ujob:data";let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;const msBusy=new Set();const cvBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",familyoffice:"",investment:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,familyoffice:null,investment:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
+const STORAGE_KEY="ujob:data";const SEARCH_TARGET=12;const SEARCH_FILL_MAX_ROUNDS=3;let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;let searchFillRound=0;let searchSessionJobs=[];const msBusy=new Set();const cvBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",familyoffice:"",investment:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,familyoffice:null,investment:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
 const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory"),primarySearch:$("primarySearch"),primaryDetails:$("primaryDetails"),detailsPanel:$("detailsPanel")};
 function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}function isBlockedTarget(job){
   const company=String(job?.company||"").trim();
@@ -45,7 +45,74 @@ function mergeState(base,raw){
 function loadState(){let merged=emptyState();try{const stable=localStorage.getItem(STORAGE_KEY);if(stable)merged=mergeState(merged,JSON.parse(stable))}catch{}try{for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(!key||key===STORAGE_KEY||!key.startsWith("ujob:"))continue;try{merged=mergeState(merged,JSON.parse(localStorage.getItem(key)||"{}"))}catch{}}}catch{}try{localStorage.setItem(STORAGE_KEY,JSON.stringify(merged))}catch{}return merged}
 function saveState(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}function esc(v){return String(v??"").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]))}function cleanAskUi(v){return String(v??"").replace(/https?:\/\/\S+/gi,"").replace(/www\.\S+/gi,"").replace(/cite[^]+/g,"").replace(/【[^】]+】/g,"").replace(/\s+/g," ").replace(/\s*[|·•-]\s*$/g,"").trim()}
 function fmtDate(value,withTime=false){if(!value)return"Not run yet";return new Intl.DateTimeFormat("en-BE",withTime?{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}:{day:"2-digit",month:"short",year:"numeric"}).format(new Date(value))}function renderToday(){if(!els.today)return;els.today.textContent=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Brussels",day:"2-digit",month:"long",year:"numeric"}).format(new Date())}
-function seenUrlsForMode(mode){const runs=mode==="search"?Object.keys(MODES).flatMap(m=>state[m]?.runs||[]):(state[mode]?.runs||[]);return runs.flatMap(run=>run.jobs.map(j=>j.url)).filter(Boolean).slice(-60)}
+function seenUrlsForMode(mode){const runs=state[mode]?.runs||[];return runs.flatMap(run=>run.jobs.map(j=>j.url)).filter(Boolean).slice(-60)}
+function isRecentPublishedClient(job,maxDays=30){
+  const value=String(job?.publishedDate||"").trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;
+  const published=new Date(value+"T00:00:00Z").getTime();
+  const now=Date.now();
+  const age=(now-published)/86400000;
+  return Number.isFinite(age)&&age>=-1&&age<=maxDays+1;
+}
+function searchJobKey(job){
+  const url=String(job?.url||"").trim();
+  return url||((String(job?.company||"").trim().toLowerCase())+"|"+(String(job?.title||"").trim().toLowerCase()));
+}
+function mergeSearchJobs(...lists){
+  const map=new Map();
+  for(const list of lists){
+    for(const raw of list||[]){
+      const job={...raw};
+      if(isBlockedTarget(job)||!job.title||!job.company||!/^https?:\/\//i.test(String(job.url||"")))continue;
+      if(!isRecentPublishedClient(job,30))continue;
+      if(Number(job.score||0)<6.2)continue;
+      const key=searchJobKey(job);
+      const old=map.get(key);
+      if(!old||Number(job.score||0)>Number(old.score||0))map.set(key,job);
+    }
+  }
+  return [...map.values()].sort((a,b)=>Number(b.score||0)-Number(a.score||0));
+}
+function collectSearchCandidatePool(){
+  const pool=[];
+  for(const mode of Object.keys(MODES)){
+    if(mode==="search")continue;
+    for(const job of state[mode]?.latest||[])pool.push({...job,sourceMode:mode});
+    for(const run of (state[mode]?.runs||[]).slice(0,3)){
+      for(const job of run.jobs||[])pool.push({...job,sourceMode:mode});
+    }
+  }
+  for(const job of searchSessionJobs)pool.push({...job,sourceMode:"search-session"});
+  const deduped=new Map();
+  for(const job of pool){
+    if(isBlockedTarget(job)||!job.title||!job.company||!/^https?:\/\//i.test(String(job.url||"")))continue;
+    if(!isRecentPublishedClient(job,30))continue;
+    if(Number(job.score||0)<6.0)continue;
+    const key=searchJobKey(job);
+    const old=deduped.get(key);
+    if(!old||Number(job.score||0)>Number(old.score||0))deduped.set(key,job);
+  }
+  return [...deduped.values()].sort((a,b)=>Number(b.score||0)-Number(a.score||0)).slice(0,48);
+}
+function collectTodayVerifiedDetailJobs(){
+  const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const jobs=[];
+  for(const mode of Object.keys(MODES)){
+    if(mode==="search")continue;
+    for(const job of state[mode]?.latest||[]){
+      const open=String(job?.openCheck||"");
+      const match=String(job?.matchCheck||"");
+      const lang=String(job?.languageCheck||"");
+      if(!open.includes("CURRENTLY_OPEN")||!open.includes(today))continue;
+      if(!/^NO_HARD_GAP\b/i.test(match))continue;
+      if(!/english/i.test(lang))continue;
+      if(/\b(dutch|french)\b.{0,30}\b(required|mandatory|fluent|professional|native)\b/i.test(lang.replace(/\bnot\s+(mandatory|required)\b/gi,"")))continue;
+      if(!Array.isArray(job.whyFit)||job.whyFit.length<3)continue;
+      jobs.push({...job,sourceMode:mode});
+    }
+  }
+  return mergeSearchJobs(jobs);
+}
 function actionKey(job){return String(job?.url||"").trim()}
 function actionCount(){return Object.keys(state.actions||{}).length}
 function findJobByKey(key,preferredMode){
@@ -405,8 +472,27 @@ function schedulePoll(mode, delay=3500){
 }
 
 function completeModeSearch(mode,data){
-  const jobs=Array.isArray(data.jobs)?data.jobs:[];
+  let jobs=Array.isArray(data.jobs)?data.jobs:[];
   const at=data.searchedAt||new Date().toISOString();
+
+  if(mode==="search"){
+    searchSessionJobs=mergeSearchJobs(searchSessionJobs,jobs,collectTodayVerifiedDetailJobs());
+    jobs=searchSessionJobs.slice(0,SEARCH_TARGET);
+
+    state.search.latest=jobs;
+    state.search.lastUpdate=at;
+    state.search.pendingSearch=null;
+    saveState();
+    clearPoll("search");
+
+    if(jobs.length<SEARCH_TARGET&&searchFillRound<SEARCH_FILL_MAX_ROUNDS){
+      searchFillRound+=1;
+      modeStatus.search=String(jobs.length)+" verified so far. Expanding across Details…";
+      if(activeView==="search")render();
+      setTimeout(()=>startModeSearch("search",0),150);
+      return;
+    }
+  }
 
   state[mode].latest=jobs;
   state[mode].lastUpdate=at;
@@ -419,11 +505,11 @@ function completeModeSearch(mode,data){
   saveState();
   clearPoll(mode);
 
-  const targetMax=mode==="search"?12:(mode==="reasonable"||mode==="prestige")?10:5;
+  const targetMax=mode==="search"?SEARCH_TARGET:(mode==="reasonable"||mode==="prestige")?10:5;
   modeStatus[mode]=jobs.length===targetMax
     ?String(targetMax)+" verified matches."
     :jobs.length>0
-      ?String(jobs.length)+" verified matches found."
+      ?String(jobs.length)+" verified matches found after full search expansion."
       :"Search completed but no verified roles were returned.";
 
   if(activeView===mode)render();
@@ -502,7 +588,7 @@ async function startModeSearch(mode,restarts=0){
     const response=await apiFetch("/api/search/start",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({mode,seenUrls:seenUrlsForMode(mode)})
+      body:JSON.stringify({mode,seenUrls:seenUrlsForMode(mode),candidatePool:mode==="search"?collectSearchCandidatePool():[]})
     },15000);
 
     const data=await response.json().catch(()=>({}));
@@ -532,6 +618,7 @@ async function startModeSearch(mode,restarts=0){
 async function runSearch(){
   if(activeView==="actions")return;
   const runMode=activeMode;
+  if(runMode==="search"){searchFillRound=0;searchSessionJobs=[];}
   await startModeSearch(runMode,0);
 }
 
