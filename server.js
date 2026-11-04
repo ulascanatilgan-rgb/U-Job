@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.6.0-ms-cv-polish";
+const APP_VERSION = "4.7.0-pinned-cv-format";
 
 const MODES = {
   search: {
@@ -962,6 +962,8 @@ function buildCvPrompt(job, note) {
     safeNote||"No extra note.",
     "",
     "Read the vacancy first. Use the URL only for research; never print a URL, citation, source marker or job-board name in the CV.",
+    "Extract the vacancy's most important ATS keywords for responsibilities, capabilities and domain language. Reuse the exact or near-exact wording only where the canonical CV facts genuinely support it.",
+    "Do not keyword-stuff. Prefer natural placement in headline, profile, skills and experience bullets. Never add a tool, responsibility, qualification or domain history the candidate does not have.",
     "",
     "RULES",
     "- Never invent achievements, numbers, team sizes, tools, languages, responsibilities or employers.",
@@ -1048,9 +1050,15 @@ function parseCvOutput(text) {
 let cvPhotoCache=null;
 async function loadCvPhoto(){
   if(cvPhotoCache)return cvPhotoCache;
-  const parts=[];
-  for(let i=1;i<=4;i++)parts.push(await readFile(path.join(__dirname,"assets","cv_photo_"+i+".txt"),"utf8"));
-  const image=Buffer.from(parts.join("").replace(/\s+/g,""),"base64");
+  let b64="";
+  try{
+    b64=await readFile(path.join(__dirname,"assets","cv_photo_master.txt"),"utf8");
+  }catch{
+    const parts=[];
+    for(let i=1;i<=4;i++)parts.push(await readFile(path.join(__dirname,"assets","cv_photo_"+i+".txt"),"utf8"));
+    b64=parts.join("");
+  }
+  const image=Buffer.from(String(b64).replace(/\s+/g,""),"base64");
   if(image.length<1000||image[0]!==0xFF||image[1]!==0xD8)throw new Error("CV photo asset is invalid.");
   cvPhotoCache=image;
   return image;
@@ -1076,93 +1084,93 @@ function buildBinaryPdf(objects){
 
 function buildTailoredCvPdf(cv,photo){
   const W=595.28,H=841.89,cmds=[];
+  const navy=[0.15,0.27,0.44], blue=[0.02,0.40,0.80], ink=[0.12,0.15,0.19], gray=[0.30,0.32,0.36];
   const rgb=c=>c.join(" ");
-  const text=(value,x,y,size=8,bold=false,color=[0.13,0.15,0.18])=>{
+  const text=(value,x,y,size=8,bold=false,color=ink)=>{
     cmds.push("BT /F"+(bold?2:1)+" "+size.toFixed(1)+" Tf "+rgb(color)+" rg 1 0 0 1 "+x.toFixed(1)+" "+y.toFixed(1)+" Tm ("+pdfEscape(value)+") Tj ET");
   };
   const fill=(x,y,w,h,c)=>cmds.push(rgb(c)+" rg "+x+" "+y+" "+w+" "+h+" re f");
-  const line=(x1,y1,x2,y2,c=[0.05,0.42,0.82],width=.7)=>cmds.push(rgb(c)+" RG "+width+" w "+x1+" "+y1+" m "+x2+" "+y2+" l S");
+  const line=(x1,y1,x2,y2,c=blue,width=.7)=>cmds.push(rgb(c)+" RG "+width+" w "+x1+" "+y1+" m "+x2+" "+y2+" l S");
   const wrap=(value,chars)=>wrapPdfText(value,chars);
-  const bullet=(value,x,y,chars,size=7.45,color=[0.28,0.30,0.34])=>{
-    text("-",x,y,size,true,[0.05,0.42,0.82]);
+  const bullet=(value,x,y,chars,size=7.25,color=gray)=>{
+    text("•",x,y,size,true,blue);
     const lines=wrap(value,chars).slice(0,3);
     let yy=y;
-    for(const ln of lines){text(ln,x+9,yy,size,false,color);yy-=9.0;}
+    for(const ln of lines){text(ln,x+10,yy,size,false,color);yy-=8.8;}
     return yy;
   };
   const section=(label,x,y,w)=>{
-    text(label,x,y,8.55,true,[0.10,0.22,0.38]);
-    line(x,y-4,x+w,y-4,[0.05,0.42,0.82],.8);
-    return y-14.5;
+    text(label,x,y,8.7,true,navy);line(x,y-4,x+w,y-4,blue,.75);return y-14.5;
   };
   const sideHeader=(label,y)=>{
-    text(label,37,y,8.6,true,[1,1,1]);
-    line(37,y-5,151,y-5,[0.55,0.67,0.80],.55);
-    return y-16.5;
+    text(label,37,y,8.5,true,[1,1,1]);line(37,y-5,158,y-5,[0.40,0.52,0.66],.45);return y-16.5;
   };
-  const sideLine=(value,y,size=7.0,bold=false)=>{
-    text(value,37,y,size,bold,[0.95,0.97,1]);
-    return y-9.9;
+  const sideLine=(value,y,size=6.85,bold=false)=>{
+    text(value,37,y,size,bold,[0.96,0.97,0.99]);return y-9.7;
+  };
+  const role=(titleLine,dateLine,bullets,x,y)=>{
+    text(titleLine,x,y,8.25,true,ink);y-=10.5;
+    text(dateLine,x,y,7.1,false,blue);y-=9.8;
+    for(const b of bullets){y=bullet(b,x+3,y,72,7.05);y-=.4;}
+    return y-3.5;
   };
 
-  fill(28,24,150,794,[0.15,0.27,0.44]);
-  cmds.push("q 105 0 0 101.6 50 682 cm /Im1 Do Q");
+  fill(24,22,151,797,navy);
+  cmds.push("q 105 0 0 101.6 50 683 cm /Im1 Do Q");
 
   let sy=666;
   sy=sideHeader("CONTACT",sy);
-  for(const v of ["Kapellen, Belgium","+32 478 66 19 13","ulascanatilgan@gmail.com","ulascanatilgan.com","linkedin.com/in/ulascntlgn"])sy=sideLine(v,sy,6.8);
-  sy-=4;sy=sideHeader("LANGUAGES",sy);
+  for(const v of ["Kapellen, Belgium","+32 478 66 19 13","ulascanatilgan@gmail.com","ulascanatilgan.com","linkedin.com/in/ulascntlgn"])sy=sideLine(v,sy,6.75);
+  sy-=5;sy=sideHeader("LANGUAGES",sy);
   for(const v of ["English - Professional","Turkish - Native","Dutch - B1","French - A2"])sy=sideLine(v,sy);
-  sy-=3;sy=sideHeader("CITIZENSHIP",sy);
-  sy=sideLine("Belgian & Turkish",sy);sy=sideLine("No work sponsorship required (EU)",sy,6.65);
-  sy-=3;sy=sideHeader("CERTIFICATIONS",sy);
-  for(const v of ["CIA - Certified Internal Auditor","CISA - Information Systems Auditor","CIAM - Identity & Access Manager","CFE - Certified Fraud Examiner","CFSA - Financial Services Auditor","Capital Markets Level 3"])sy=sideLine(v,sy,6.4);
-  sy-=3;sy=sideHeader("CORE SKILLS",sy);
-  for(const v of cv.skills.slice(0,8))sy=sideLine(v,sy,6.65);
+  sy-=4;sy=sideHeader("CITIZENSHIP",sy);
+  sy=sideLine("Belgian & Turkish",sy);sy=sideLine("EU work authorisation",sy);
+  sy-=4;sy=sideHeader("CERTIFICATIONS",sy);
+  for(const v of ["CIA - Internal Auditor","CISA - Information Systems","CFE - Fraud Examiner","CFSA - Financial Services","CML 3 - Capital Markets (TR)","CIAM - Identity & Access Mgmt"])sy=sideLine(v,sy,6.45);
+  sy-=4;sy=sideHeader("CORE SKILLS",sy);
+  for(const v of cv.skills.slice(0,8))sy=sideLine(v,sy,6.55);
+  sy-=4;sy=sideHeader("ONLINE",sy);
+  sy=sideLine("Professional / project portfolio:",sy,6.35);
+  sy=sideLine("ulascanatilgan.com",sy,6.55);
+  if(cv.hondinnInclude)sy=sideLine("Business venture: Hondinn",sy,6.35);
+  if(cv.hawkeyeInclude)sy=sideLine("Earlier: Hawk-Eye / Sony (2018-19)",sy,6.15);
 
-  if(cv.digitalInclude&&cv.digital.length&&sy>120){
-    sy-=3;sy=sideHeader("DIGITAL",sy);
-    for(const v of cv.digital.slice(0,2))for(const ln of wrap(v,29).slice(0,2))sy=sideLine(ln,sy,6.25);
-  }
-  if(cv.additionalInclude&&cv.additional.length&&sy>82){
-    sy-=3;sy=sideHeader("ADDITIONAL",sy);
-    for(const v of cv.additional.slice(0,2))for(const ln of wrap(v,29).slice(0,2))sy=sideLine(ln,sy,6.25);
-  }
+  const x=192,right=565,rw=right-x;
+  text("ULAS ATILGAN",x,793,19.2,true,navy);
+  text(cv.headline,x,772,10.2,false,blue);
 
-  const x=194,right=564,rw=right-x;
-  text("ULAS ATILGAN",x,790,19,true,[0.10,0.22,0.38]);
-  text(cv.headline,x,770,10,false,[0.02,0.40,0.80]);
-
-  let y=750;
+  let y=747;
   y=section("PROFILE",x,y,rw);
-  for(const p of cv.profile.slice(0,3)){y=bullet(p,x+4,y,72,7.45);y-=1.5;}
+  const profileText=cv.profile.join(" ");
+  for(const ln of wrap(profileText,91).slice(0,5)){text(ln,x,y,7.65,false,gray);y-=9.2;}
+  y-=4;
 
-  y-=1;y=section("PROFESSIONAL EXPERIENCE",x,y,rw);
-  const role=(titleLine,dateLine,bullets)=>{
-    text(titleLine,x,y,8.5,true,[0.08,0.09,0.11]);y-=10.5;
-    text(dateLine,x,y,7.0,false,[0.02,0.40,0.80]);y-=9.5;
-    for(const b of bullets){y=bullet(b,x+4,y,73,7.1);y-=.5;}
-    y-=3.5;
-  };
-
+  y=section("PROFESSIONAL EXPERIENCE",x,y,rw);
   const ingTitle="Access Operations Manager - ING Belgium"+(cv.ingDescriptor?" | "+cv.ingDescriptor:"");
-  role(ingTitle,"2020 - Present | Brussels, Belgium",cv.ing.slice(0,3));
-  if(cv.hondinnInclude&&cv.hondinn.length)role("Business Manager - Hondinn (own venture) | boutique dog hotel","2023 - Present | Kapellen, Belgium",cv.hondinn.slice(0,2));
-  role("Corporate Audit Services - ING Belgium","2019 - 2020 | Brussels, Belgium",cv.audit.length?cv.audit.slice(0,2):["Coordinated assurance workstreams, senior-stakeholder findings and remediation across banking and operational functions."]);
-  role("Project & Control Manager - BPN Payment & E-money Institution","2017 - 2019 | Istanbul, Turkey",cv.bpn.slice(0,2));
-  if(cv.hawkeyeInclude&&cv.hawkeye)role("Football Systems Consultant (part-time) - Hawk-Eye Innovations (Sony)","2018 - 2019 | Turkey",[cv.hawkeye]);
-  role("Internal Auditor - Akbank / Denizbank","2014 - 2017 | Istanbul, Turkey",[cv.internal||"Delivered operational, compliance, lending and IT-control reviews; documented findings and tracked remediation."]);
+  y=role(ingTitle,"2020 - Present | Brussels, Belgium",cv.ing.slice(0,3),x,y);
+  if(cv.hondinnInclude&&cv.hondinn.length)y=role("Business Manager (own venture) - Hondinn","2023 - Present | Kapellen, Belgium",cv.hondinn.slice(0,2),x,y);
+  y=role("Corporate Audit Services - ING Belgium","2019 - 2020 | Brussels, Belgium",cv.audit.length?cv.audit.slice(0,2):["Coordinated assurance workstreams, senior-stakeholder findings and remediation across banking and operational functions."],x,y);
+  y=role("Project & Control Manager - BPN Payment & E-money Institution","2017 - 2019 | Istanbul, Turkey",cv.bpn.slice(0,2),x,y);
+  if(cv.hawkeyeInclude&&cv.hawkeye)y=role("Football Systems Consultant (part-time) - Hawk-Eye Innovations (Sony)","2018 - 2019 | Turkey",[cv.hawkeye],x,y);
+  y=role("Internal Auditor - Akbank / Denizbank","2014 - 2017 | Istanbul, Turkey",[cv.internal||"Delivered operational, compliance, lending and IT-control reviews; documented findings and tracked remediation."],x,y);
 
-  y=Math.max(y-1,82);
+  const projectLines=[...(cv.digitalInclude?cv.digital:[]),...(cv.additionalInclude?cv.additional:[])].filter(Boolean).slice(0,4);
+  if(projectLines.length&&y>120){
+    y=section(cv.digitalInclude?"SELECTED PROJECTS & ANALYTICS":"SELECTED PROJECTS",x,y,rw);
+    for(const p of projectLines){y=bullet(p,x+3,y,72,7.05);y-=1;}
+    y-=2;
+  }
+
+  y=Math.max(y,78);
   y=section("EDUCATION",x,y,rw);
   const edu=[
-    "M.Sc. Information Technology - Sabanci University, Istanbul (2018)",
-    "B.Sc. Business Administration - TOBB University, Ankara (2014)",
-    "B.Sc. International Relations (Double Major) - TOBB University, Ankara (2015)",
-    "Exchange Student, International Business - Hogeschool Utrecht (2012)"
+    "M.Sc. Information Technology - Sabanci University, 2018",
+    "B.Sc. Business Administration - TOBB University, 2014",
+    "B.Sc. International Relations (Double Major) - TOBB University, 2015",
+    "Exchange, International Business - Hogeschool Utrecht, 2012"
   ];
-  for(const e of edu){text(e,x,y,7.05,e.startsWith("M.Sc.")||e.startsWith("B.Sc."),[0.16,0.17,0.19]);y-=9.0;}
-  if(y<34)throw new Error("Tailored CV content is too long for the one-page format.");
+  for(const e of edu){text(e,x,y,6.95,e.startsWith("M.Sc.")||e.startsWith("B.Sc."),ink);y-=8.8;}
+  if(y<30)throw new Error("Tailored CV content is too long for the one-page master format.");
 
   const stream=cmds.join("\n");
   const imageObject=Buffer.concat([
@@ -1181,6 +1189,50 @@ function buildTailoredCvPdf(cv,photo){
     imageObject,
     contentObject
   ]);
+}
+
+function masterCvData(){
+  return {
+    headline:"Banking Operations | Investment Analytics & Technology",
+    profile:[
+      "Banking and fintech professional with 12+ years across operations, audit, governance and technology.",
+      "Analytically minded financial markets enthusiast following equities and macroeconomic trends.",
+      "Develops personal AI-assisted applications combining financial data, numerical analysis and technology."
+    ],
+    skills:["Financial Data & Analysis","Markets & Equity Research*","Risk, Governance & Controls","Technology & AI-Assisted Tools","Process & Data Improvement","Project & Change Delivery","Stakeholder Coordination","Operations & Reporting"],
+    ingDescriptor:"",
+    ing:[
+      "Coordinate cross-functional operations in banking technology, connecting business, IT, risk and support teams to maintain reliable, controlled services.",
+      "Lead application onboarding, technology integrations and platform migrations while managing dependencies, priorities and operational risks.",
+      "Use governance, data and process reviews to identify gaps and drive improvements in controls, reporting and execution."
+    ],
+    hondinnInclude:true,
+    hondinn:["Run my own service venture, managing pricing, financial tracking, customer operations and digital workflows."],
+    audit:[
+      "Analysed banking activities, credit and operational risks, governance and controls; translated audit findings into clear recommendations.",
+      "Presented observations to senior stakeholders and monitored remediation progress and action plans."
+    ],
+    bpn:[
+      "Managed strategic, operational and compliance projects in a regulated fintech, supporting new activities and licensing preparation.",
+      "Coordinated with executives, regulators and external advisors, including PwC and KPMG."
+    ],
+    hawkeyeInclude:false,
+    hawkeye:"",
+    internal:"Reviewed branch and head-office processes across lending, compliance, banking operations and IT controls; tracked findings and remediation.",
+    digitalInclude:true,
+    digital:[
+      "UlasTrade - AI-assisted investment research tools: equity screening, earnings analysis, market monitoring and fundamental/technical research.",
+      "Independent financial-markets research across company financials, portfolio performance, macroeconomics and investment risk."
+    ],
+    additionalInclude:false,
+    additional:[]
+  };
+}
+
+async function generateMasterCvFormat(res){
+  const photo=await loadCvPhoto();
+  const pdf=buildTailoredCvPdf(masterCvData(),photo);
+  return sendPdf(res,pdf,"Ulas_Atilgan_UJob_Master_CV_Format.pdf");
 }
 
 function safeCvFilename(job){
@@ -1498,6 +1550,14 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && url.pathname === "/api/ask/analyze") {
       return await analyzeAskLink(req, res);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/cv/format") {
+      try { return await generateMasterCvFormat(res); }
+      catch (error) {
+        console.error("U-Job CV format error:", error);
+        return sendJson(res, 500, { error: error?.message || "Could not create CV format." });
+      }
     }
 
     if (req.method === "POST" && url.pathname === "/api/cv/generate") {
