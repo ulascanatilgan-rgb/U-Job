@@ -803,19 +803,10 @@ function buildMotivationPdf(job, ms) {
   const rightText = (value,right,y,size=9,bold=false,color=muted) => {
     text(value,right-estimateWidth(value,size,bold),y,size,bold,color);
   };
-  const justifiedLine = (value,x,y,size,maxWidth,color=ink,last=false) => {
-    const words=pdfSafeText(value).split(/\s+/).filter(Boolean);
-    if(last||words.length<3){text(words.join(" "),x,y,size,false,color);return;}
-    const wordWidths=words.map(w=>estimateWidth(w,size,false));
-    const wordsWidth=wordWidths.reduce((a,b)=>a+b,0);
-    const gap=Math.max(size*0.28,(maxWidth-wordsWidth)/(words.length-1));
-    let xx=x;
-    words.forEach((w,i)=>{text(w,xx,y,size,false,color);xx+=wordWidths[i]+gap;});
-  };
   const paragraph = (value,x,y,size,maxWidth,lead,maxLines=4) => {
-    const chars=Math.max(70,Math.floor(maxWidth/(size*0.49)));
+    const chars=Math.max(82,Math.floor(maxWidth/(size*0.47)));
     const lines=wrapPdfText(value,chars).slice(0,maxLines);
-    lines.forEach((line,i)=>justifiedLine(line,x,y-i*lead,size,maxWidth,ink,i===lines.length-1));
+    lines.forEach((line,i)=>text(line,x,y-i*lead,size,false,ink));
     return y-lines.length*lead;
   };
 
