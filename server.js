@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.4.1-detail-autofill";
+const APP_VERSION = "4.5.0-reasonable-guaranteed-fill";
 
 const MODES = {
   search: {
@@ -21,7 +21,7 @@ const MODES = {
   reasonable: {
     label: "Reasonable",
     geography: "Belgium, with Antwerp/Kapellen/Brasschaat and Brussels first; Mechelen/Ghent/Leuven next. Hybrid roles are welcome.",
-    focus: "Fintech-first realistic next-step roles. Highest priority: Business Operations Manager and Strategy & Operations. Then search Product Operations, Payments Operations, Customer/Client Operations, Implementation, Business Manager, Chief of Staff, Strategic Partnerships, Programme/Project Operations, Transformation Operations and high-ownership operational roles in fintech, payments, digital banking, wealth/investment tech, regtech, insurtech and financial infrastructure. The candidate should be able to compete strongly using banking, audit/control, fraud, IAM/security, stakeholder management, project/process ownership, analytics, entrepreneurship and AI/automation experience. Prefer dynamic international teams, visible ownership, people contact and career progression. Avoid junior/repetitive back-office roles, narrow IAM-only roles and pure compliance/audit jobs unless the scope is broader and strategically attractive."
+    focus: "Realistic next-step roles where this candidate can compete credibly without needing a long new-domain track record. Fintech/payments/digital banking remain first priority, especially Business Operations, Strategy & Operations, Operations Manager, Product Operations, Payments Operations, Customer/Client Operations, Implementation, Business Manager, Chief of Staff, Partnerships and Transformation/Programme Operations. If fintech is thin, broaden deliberately to high-fit startups/scale-ups, investment/wealth-tech and investment-product operations, AI/business transformation, banking/financial-services operations, family-office/business-manager roles, broad technology/security governance, and strong local Antwerp/Kapellen operations/project roles. Use banking, audit/control, fraud, IAM/security, project/stakeholder management, analytics, entrepreneurship and AI/automation as transferable evidence. Prefer ownership, English-speaking international teams, people contact, visible impact and progression. Reject junior/repetitive work, narrow IAM administration, pure compliance/audit, hard domain-experience gaps and mandatory professional Dutch/French."
   },
   creative: {
     label: "Creative",
@@ -228,9 +228,12 @@ const MODE_SOURCE_PLANS = {
   ],
 
   "reasonable": [
-    "WAVE 1: fintech/payments/digital-bank employers + Business Operations, Strategy & Operations, Operations Manager.",
-    "WAVE 2: Product Ops, Payments Ops, Implementation, Customer/Client Ops, Partnerships, Business Manager, Chief of Staff, Transformation/Programme Ops in the same sectors.",
-    "WAVE 3: adjacent high-fit fintech/payment/financial-infrastructure roles; use LinkedIn, Welcome to the Jungle, Wellfound and Robert Walters/Hays/Michael Page for discovery, then verify official/ATS."
+    "WAVE 1: fintech/payments/digital-bank/financial-infrastructure employers — Business Operations, Strategy & Operations, Operations Manager, Product/Payments Ops, Implementation, Customer/Client Ops and Partnerships.",
+    "WAVE 2: Belgian startups/scale-ups, wealth-tech/investment-tech, AI/business-transformation and technology companies — Business Manager, Chief of Staff, Strategy/Operations, Customer Success, Implementation and Programme/Project Ops.",
+    "WAVE 3: banks/financial services excluding ING, investment-product/operations, family-office/business-manager, security-governance/transformation and cross-functional corporate operations where broad banking experience transfers directly.",
+    "WAVE 4: Antwerp/Kapellen local employers and strong SMEs with operations/project/client ownership; use VDAB, Jobat, LinkedIn, specialist recruiters and direct employer sites.",
+    "WAVE 5 hidden gems: boutique recruiters, portfolio-company pages, founder/company posts and niche sector boards. Re-open the exact vacancy and verify current application status before accepting.",
+    "Do not stop after one narrow category. Continue through all waves until at least 5 credible current matches are available, aiming for 5-10."
   ],
   "creative": [
     "WAVE 1 — crafted interiors: premium interior studios, renovation/fit-out firms, cabinetry/joinery, furniture ateliers, kitchens, lighting, materials, architectural showrooms and high-end residential project companies around Antwerp.",
@@ -328,8 +331,8 @@ function buildPrompt(mode, seenUrls, candidatePool = []) {
     ? pool.map((job,i) => (i+1)+". ["+(job.sourceMode||"detail")+"] "+job.title+" | "+job.company+" | "+job.location+" | "+job.publishedDate+" | prior score "+job.score+" | "+job.url).join("\n")
     : "None.";
   const maxAge = mode === "linkedin" ? 7 : 30;
-  const target = mode === "search" ? 36 : mode === "prestige" ? 15 : mode === "creative" ? 12 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "investment" || mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
-  const finalTarget = mode === "search" ? "10-12" : (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
+  const target = mode === "search" ? 36 : mode === "reasonable" ? 20 : mode === "prestige" ? 15 : mode === "creative" ? 12 : mode === "kapellen" ? 10 : (mode === "investment" || mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
+  const finalTarget = mode === "search" ? "10-12" : mode === "reasonable" ? "5-10" : mode === "prestige" ? "6-10" : "3-5";
   const stopAt = mode === "search" ? 12 : (mode === "reasonable" || mode === "prestige") ? 10 : 5;
 
   const special = mode === "linkedin"
@@ -342,6 +345,8 @@ function buildPrompt(mode, seenUrls, candidatePool = []) {
           ? "PRESTIGE: Belgium first. Candidate is Belgian/EU citizen and age 35. Belgian/EU-nationality requirements are acceptable. Reject only if an explicit age cap makes age 35 ineligible, or another hard eligibility requirement is not met. AGE_CHECK is mandatory."
           : mode === "kapellen"
             ? "KAPELLEN: final location must be in the specified local area. English must be sufficient; Dutch may be optional/preferred but not mandatory."
+            : mode === "reasonable"
+              ? "REASONABLE: fintech first, but this is a realistic-career-match mode rather than a sector purity test. Continue into adjacent startup, investment/product, AI/transformation, corporate operations and local-business waves until a useful result set exists."
             : mode === "fintech"
               ? "FINTECH: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure."
               : mode === "dogs"
@@ -379,7 +384,7 @@ SEARCH PLAN
 - Verify EACH final role by RE-OPENING the exact vacancy in this run: exact YYYY-MM-DD publication date, role still visibly open, a live application path/button or explicit current application instruction, English sufficient, no mandatory extra language, real profile fit.
 - Reject stale/closed/expired/cached-only/search-index-only listings, generic careers pages, guessed dates, missing application paths, major must-have gaps, junior/repetitive roles and irrelevant matches.
 - Prefer unseen roles. Seen URLs may be reused only if still live and needed for a strong result set.
-- Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : mode === "search" ? "6.2" : "6.5"}.
+- Fit score 0-10. Minimum: ${mode === "global" ? "7.5" : mode === "swmo" ? "7.2" : mode === "search" ? "6.2" : mode === "reasonable" ? "6.0" : "6.5"}.
 - HARD-MATCH RULE for every mode: read the must-have experience requirements, not only the title. If the vacancy requires multiple years of specific domain experience the candidate clearly does not possess, REJECT it even if the employer/sector is attractive. Transferable banking/operations/analytics experience counts only when the vacancy wording reasonably allows adjacent/relevant experience.
 - For accepted roles output MATCH_CHECK: NO_HARD_GAP | short explanation of why the mandatory experience requirements are realistically met or transferable.
 - Prestige mode: candidate is Belgian/EU citizen and age 35. Check explicit age, nationality, clearance and status requirements. Do not reject Belgian/EU nationality requirements. Reject age-capped programmes if 35 is outside the allowed range. Output AGE_CHECK with the eligibility conclusion.
@@ -391,6 +396,7 @@ SEARCH PLAN
 - Search mode: cover every Details theme during discovery, enforce the same hard-match rule, then rank all categories on one common score and return the overall top twelve. Diversity is desirable only among genuinely strong matches; never add a weaker role just to represent a category.
 - Search completion rule: DO NOT voluntarily stop at 2, 3, 5 or 8 results. Re-check the prior candidate pool and continue through all coverage waves until 12 eligible roles are found. Return fewer than 12 only if the full candidate pool and all search waves have genuinely been exhausted after current-page verification.
 - Detail-mode completion rule: for every non-Search mode, aim for at least 3 strong verified roles and preferably 5. If fewer than 3 survive, re-check the related prior candidate pool and broaden role-title synonyms/sources within the SAME mode before returning. Do not stop after the first weak/empty query wave.
+- Reasonable completion rule: do not return NO_VERIFIED_JOBS after only a fintech pass. Re-check the related prior candidate pool and continue through startup, investment/product, AI/transformation, corporate-operations and Antwerp/Kapellen waves. Aim for at least 5 current credible roles.
 - Fintech mode: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure; ordinary banks qualify only for a clearly fintech/technology venture or product unit.
 - WHY_FIT lines must be short and specific: profile fit; work/scope appeal; career/compensation leverage. Never invent salary.
 
@@ -487,7 +493,7 @@ FINAL CHECK BEFORE OUTPUT
 - KAPELLEN: final location must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or a clearly local adjacent northern-Antwerp location named in the mode geography.
 - CREATIVE: seek distinctive premium/lifestyle/heritage environments (clubs, yachts, classic/performance cars, tailoring, watches, estates, private aviation, boutique hospitality, wine/spirits, design/interiors). Reject generic retail/hospitality filler and hands-on trade jobs requiring qualifications the candidate lacks.
 - DOGS: final employer must be genuinely dog/pet/animal-sector related; English sufficient; reject mandatory professional Dutch/French and low-skill animal-care filler roles.
-- ${(mode === "search" || mode === "reasonable" || mode === "prestige") ? (mode === "search" ? "Search: cover all Details themes, rank them together and return up to 12 excellent roles." : mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: aim for 6-10 excellent roles, maximum 10.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
+- ${(mode === "search" || mode === "reasonable" || mode === "prestige") ? (mode === "search" ? "Search: cover all Details themes, rank them together and return up to 12 excellent roles." : mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: search all fallback waves and aim for 5-10 credible roles, maximum 10; do not stop after a narrow fintech pass.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
 - Do not output rejected roles or commentary.`;
 }
 
@@ -595,7 +601,7 @@ function finalizeJobsFromResponse(data, mode = "") {
     .filter(job => hasCurrentOpenCheck(job))
     .filter(job => hasNoHardExperienceGap(job))
     .filter(job => isAllowedPublishedDate(job.publishedDate, mode))
-    .filter(job => job.score >= (mode === "global" ? 7.5 : mode === "swmo" ? 7.2 : mode === "search" ? 6.2 : 6.5))
+    .filter(job => job.score >= (mode === "global" ? 7.5 : mode === "swmo" ? 7.2 : mode === "search" ? 6.2 : mode === "reasonable" ? 6.0 : 6.5))
     .filter(job => mode !== "linkedin" || isLinkedInJobUrl(job.url))
     .filter(job => mode !== "global" || hasVerifiedEuropeRemote(job))
     .filter(job => mode !== "swmo" || hasRealisticSwmoMobility(job))
