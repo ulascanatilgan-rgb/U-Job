@@ -782,38 +782,77 @@ function wrapPdfText(value, maxChars) {
 function buildMotivationPdf(job, ms) {
   const W = 595.28, H = 841.89;
   const commands = [];
-  const text = (value, x, y, size=9, bold=false, gray=0.12) => {
-    commands.push(`BT /F${bold ? 2 : 1} ${size.toFixed(1)} Tf ${gray} g 1 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)} Tm (${pdfEscape(value)}) Tj ET`);
+  const navy = [0.08,0.18,0.31];
+  const ink = [0.12,0.14,0.17];
+  const muted = [0.34,0.37,0.42];
+
+  const rgb = c => c.join(" ");
+  const text = (value, x, y, size=9, bold=false, color=ink) => {
+    commands.push(`BT /F${bold ? 2 : 1} ${size.toFixed(1)} Tf ${rgb(color)} rg 1 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)} Tm (${pdfEscape(value)}) Tj ET`);
   };
-  const rule = (x1,y1,x2,y2,gray=0.88) => commands.push(`${gray} G 0.6 w ${x1} ${y1} m ${x2} ${y2} l S`);
+  const rule = (x1,y1,x2,y2,color=navy,width=0.8) => {
+    commands.push(`${rgb(color)} RG ${width} w ${x1} ${y1} m ${x2} ${y2} l S`);
+  };
+  const estimateWidth = (value,size,bold=false) => pdfSafeText(value).split("").reduce((sum,ch)=>{
+    if(ch===" ") return sum + size*0.25;
+    if(/[MW@#%]/.test(ch)) return sum + size*0.72;
+    if(/[ilI1.,:;'|]/.test(ch)) return sum + size*0.25;
+    if(/[A-Z0-9]/.test(ch)) return sum + size*(bold?0.57:0.54);
+    return sum + size*(bold?0.53:0.50);
+  },0);
+  const rightText = (value,right,y,size=9,bold=false,color=muted) => {
+    text(value,right-estimateWidth(value,size,bold),y,size,bold,color);
+  };
+  const justifiedLine = (value,x,y,size,maxWidth,color=ink,last=false) => {
+    const words=pdfSafeText(value).split(/\s+/).filter(Boolean);
+    if(last||words.length<3){text(words.join(" "),x,y,size,false,color);return;}
+    const wordWidths=words.map(w=>estimateWidth(w,size,false));
+    const wordsWidth=wordWidths.reduce((a,b)=>a+b,0);
+    const gap=Math.max(size*0.28,(maxWidth-wordsWidth)/(words.length-1));
+    let xx=x;
+    words.forEach((w,i)=>{text(w,xx,y,size,false,color);xx+=wordWidths[i]+gap;});
+  };
+  const paragraph = (value,x,y,size,maxWidth,lead,maxLines=4) => {
+    const chars=Math.max(70,Math.floor(maxWidth/(size*0.49)));
+    const lines=wrapPdfText(value,chars).slice(0,maxLines);
+    lines.forEach((line,i)=>justifiedLine(line,x,y-i*lead,size,maxWidth,ink,i===lines.length-1));
+    return y-lines.length*lead;
+  };
 
-  let y = 797;
-  text("Ulas Atilgan", 46, y, 10.4, true, 0.10); y -= 16;
-  text(job.title || "Application", 46, y, 9.2, false, 0.27); y -= 13;
-  if (job.company) { text(job.company, 46, y, 9.2, false, 0.27); y -= 23; }
-  rule(46,y+9,549,y+9,0.89);
-  text("Motivation Statement", 46, y-7, 17.0, true, 0.08); y -= 31;
+  const date = new Intl.DateTimeFormat("en-GB", {
+    timeZone:"Europe/Brussels", day:"2-digit", month:"short", year:"numeric"
+  }).format(new Date());
 
-  const introLines = wrapPdfText(ms.intro, 116).slice(0,4);
-  for (const line of introLines) { text(line,46,y,8.9,false,0.20); y -= 11.4; }
-  y -= 9;
+  let y = 775;
+  text("Ulas Atilgan",46,y,11.0,true,navy);
+  rightText(date,549,y,9.0,false,muted);
+  y -= 18;
+  text(job.title || "Application",46,y,9.4,false,muted); y -= 13;
+  if(job.company){text(job.company,46,y,9.4,false,muted); y -= 23;}
 
-  const bodySize = 8.55, bodyLead = 10.35;
-  for (let i=0;i<7;i++) {
-    const p = ms.points[i];
-    const num = String(i+1).padStart(2,"0");
-    text(num,46,y,9.1,true,0.43);
-    text(p.title,67,y,9.1,true,0.11);
-    y -= 12.5;
-    const lines = wrapPdfText(p.text, 114).slice(0,4);
-    for (const line of lines) { text(line,58,y,bodySize,false,0.23); y -= bodyLead; }
-    y -= 6.2;
+  rule(46,y+9,549,y+9,navy,1.15);
+  text("Motivation Statements",46,y-9,17.2,true,navy); y -= 35;
+
+  y=paragraph(ms.intro,46,y,9.15,503,12.4,4)-10;
+
+  const bodySize=9.0, bodyLead=11.5;
+  for(let i=0;i<7;i++){
+    const p=ms.points[i];
+    text(String(i+1),46,y,9.8,true,navy);
+    text(p.title,66,y,9.7,true,ink);
+    y-=14.5;
+    y=paragraph(p.text,58,y,bodySize,491,bodyLead,4);
+    if(i<6){
+      y-=7.5;
+      rule(58,y+2,549,y+2,[0.78,0.82,0.87],0.45);
+      y-=10.5;
+    }
   }
 
-  if (y < 38) throw new Error("Generated motivation statement is too long for the one-page format.");
+  if(y<42) throw new Error("Generated motivation statement is too long for the one-page format.");
 
-  const stream = commands.join("\n");
-  const objects = [
+  const stream=commands.join("\n");
+  const objects=[
     null,
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
@@ -823,16 +862,16 @@ function buildMotivationPdf(job, ms) {
     `<< /Length ${Buffer.byteLength(stream,"latin1")} >>\nstream\n${stream}\nendstream`
   ];
 
-  let pdf = "%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
-  const offsets = [0];
-  for (let i=1;i<objects.length;i++) {
-    offsets[i] = Buffer.byteLength(pdf,"latin1");
-    pdf += `${i} 0 obj\n${objects[i]}\nendobj\n`;
+  let pdf="%PDF-1.4\n%\xE2\xE3\xCF\xD3\n";
+  const offsets=[0];
+  for(let i=1;i<objects.length;i++){
+    offsets[i]=Buffer.byteLength(pdf,"latin1");
+    pdf+=`${i} 0 obj\n${objects[i]}\nendobj\n`;
   }
-  const xref = Buffer.byteLength(pdf,"latin1");
-  pdf += `xref\n0 ${objects.length}\n0000000000 65535 f \n`;
-  for (let i=1;i<objects.length;i++) pdf += String(offsets[i]).padStart(10,"0") + " 00000 n \n";
-  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  const xref=Buffer.byteLength(pdf,"latin1");
+  pdf+=`xref\n0 ${objects.length}\n0000000000 65535 f \n`;
+  for(let i=1;i<objects.length;i++) pdf+=String(offsets[i]).padStart(10,"0")+" 00000 n \n";
+  pdf+=`trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
   return Buffer.from(pdf,"latin1");
 }
 
