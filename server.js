@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.3.2-remove-max-output-tokens";
+const APP_VERSION = "4.4.0-search12-fill-pool";
 
 const MODES = {
   search: {
@@ -308,15 +308,29 @@ function getModeSourcePlan(mode) {
   return (MODE_SOURCE_PLANS[mode] || []).map(v => "- " + v).join("\n");
 }
 
-function buildPrompt(mode, seenUrls) {
+function buildPrompt(mode, seenUrls, candidatePool = []) {
   const cfg = MODES[mode];
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit"
   }).format(new Date());
 
   const seen = seenUrls.slice(-50).map(normalizeUrl).filter(Boolean);
+  const pool = mode === "search"
+    ? candidatePool.slice(0, 48).map(job => ({
+        title: String(job?.title || "").trim().slice(0,100),
+        company: String(job?.company || "").trim().slice(0,80),
+        location: String(job?.location || "").trim().slice(0,70),
+        url: normalizeUrl(job?.url),
+        publishedDate: String(job?.publishedDate || "").trim().slice(0,10),
+        score: Math.round((Number(job?.score)||0)*10)/10,
+        sourceMode: String(job?.sourceMode || "").trim().slice(0,24)
+      })).filter(job => job.title && job.company && /^https?:\/\//i.test(job.url))
+    : [];
+  const poolText = pool.length
+    ? pool.map((job,i) => (i+1)+". ["+(job.sourceMode||"detail")+"] "+job.title+" | "+job.company+" | "+job.location+" | "+job.publishedDate+" | prior score "+job.score+" | "+job.url).join("\n")
+    : "None.";
   const maxAge = mode === "linkedin" ? 7 : 30;
-  const target = mode === "search" ? 30 : mode === "prestige" ? 15 : mode === "creative" ? 12 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "investment" || mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
+  const target = mode === "search" ? 36 : mode === "prestige" ? 15 : mode === "creative" ? 12 : mode === "reasonable" ? 12 : mode === "kapellen" ? 10 : (mode === "investment" || mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
   const finalTarget = mode === "search" ? "10-12" : (mode === "reasonable" || mode === "prestige") ? "6-10" : "3-5";
   const stopAt = mode === "search" ? 12 : (mode === "reasonable" || mode === "prestige") ? 10 : 5;
 
@@ -341,7 +355,7 @@ function buildPrompt(mode, seenUrls) {
                     : mode === "familyoffice"
                     ? "FAMILY O.: employer must genuinely be a family office, multi-family office, family investment/holding structure, owner office, wealth/investment boutique or family-controlled group. Reject roles whose core requirement is tax-law expertise, a pre-existing HNW sales book or specialist discretionary portfolio management."
                     : mode === "search"
-                    ? "SEARCH: this is the master ranking across every U-Job theme. Do not force category diversity or quotas; return the ten strongest roles overall."
+                    ? "SEARCH: this is the master ranking across every U-Job theme. Re-check the prior candidate pool first, then search all Details themes until 12 strong verified roles are available. Do not stop early merely because one category produced only a few roles."
                     : "";
 
   return `Find CURRENT vacancies using live web search.
@@ -377,11 +391,16 @@ SEARCH PLAN
 - Family O. mode: favour broad operator/right-hand/investment-operations/governance roles where banking, controls, reporting, stakeholder and entrepreneurial experience transfer directly. Reject pure estate-tax-law, client-book-dependent private banking and specialist portfolio-management roles.
 - Investment mode: favour bridge roles in investment product/operations/data/research/economics/wealth-tech. Reject senior/specialist roles whose must-haves depend on years of direct professional investing, portfolio management, equity research, investment banking/M&A or a HNW client book.
 - Search mode: cover every Details theme during discovery, enforce the same hard-match rule, then rank all categories on one common score and return the overall top twelve. Diversity is desirable only among genuinely strong matches; never add a weaker role just to represent a category.
+- Search completion rule: DO NOT voluntarily stop at 2, 3, 5 or 8 results. Re-check the prior candidate pool and continue through all coverage waves until 12 eligible roles are found. Return fewer than 12 only if the full candidate pool and all search waves have genuinely been exhausted after current-page verification.
 - Fintech mode: employer must genuinely operate in fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure; ordinary banks qualify only for a clearly fintech/technology venture or product unit.
 - WHY_FIT lines must be short and specific: profile fit; work/scope appeal; career/compensation leverage. Never invent salary.
 
 FOCUSED SOURCE PLAN
 ${getModeSourcePlan(mode)}
+
+PRIOR CANDIDATE POOL TO RE-VERIFY
+${mode === "search" ? poolText : "N/A"}
+${mode === "search" ? "These prior candidates came from detailed U-Job searches. They are NOT automatically valid today. Re-open them now. Keep any that still satisfy freshness, open/application, English and hard-match rules. They are candidates to reuse, not URLs to avoid." : ""}
 
 ALREADY SEEN URLS:
 ${seen.length ? seen.join("\n") : "None"}
@@ -1252,7 +1271,8 @@ async function startSearch(req, res) {
   if (!MODES[mode]) return sendJson(res, 400, { error: "Unknown mode." });
 
   const seenUrls = Array.isArray(body?.seenUrls) ? body.seenUrls.map(String) : [];
-  const strictPrompt = buildStrictPrompt(buildPrompt(mode, seenUrls), mode);
+  const candidatePool = mode === "search" && Array.isArray(body?.candidatePool) ? body.candidatePool.slice(0,48) : [];
+  const strictPrompt = buildStrictPrompt(buildPrompt(mode, seenUrls, candidatePool), mode);
 
   try {
     const data = await openAIRequest("https://api.openai.com/v1/responses", {
