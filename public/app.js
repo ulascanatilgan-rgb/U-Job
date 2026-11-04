@@ -2,7 +2,7 @@ const MODES={search:{title:"Search",hint:"Best 12 opportunities across every U-J
 const STORAGE_KEY="ujob:data";const SEARCH_TARGET=12;const SEARCH_FILL_MAX_ROUNDS=4;const DETAIL_MIN_TARGET=3;const DETAIL_FILL_MAX_ROUNDS=3;let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;let searchFillRound=0;let searchSessionJobs=[];const detailFillRounds={};const detailSessionJobs={};const msBusy=new Set();const cvBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",familyoffice:"",investment:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,familyoffice:null,investment:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
 function detailMinTargetFor(mode){return mode==="reasonable"?5:DETAIL_MIN_TARGET}
 function detailFillMaxRoundsFor(mode){return mode==="reasonable"?5:DETAIL_FILL_MAX_ROUNDS}
-const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory"),primarySearch:$("primarySearch"),primaryDetails:$("primaryDetails"),detailsPanel:$("detailsPanel")};
+const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory"),primarySearch:$("primarySearch"),primaryDetails:$("primaryDetails"),detailsPanel:$("detailsPanel"),formatButton:$("formatButton")};
 function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}function isBlockedTarget(job){
   const company=String(job?.company||"").trim();
   return /^(?:ING|ING Bank|ING Belgium|ING Group)(?:\b|\s|[-–—])/i.test(company)||/\bING\s+(?:Bank|Belgium|Group)\b/i.test(company);
@@ -329,7 +329,27 @@ function downloadPdfBlob(blob,filename){
   a.remove();
   setTimeout(()=>URL.revokeObjectURL(blobUrl),120000);
 }
-async function updateCv(key,button){
+async function downloadMasterCvFormat(){
+  const button=els.formatButton;
+  if(!button)return;
+  const old=button.textContent;
+  button.disabled=true;button.textContent="…";
+  try{
+    const response=await apiFetch("/api/cv/format",{method:"GET"},45000);
+    if(!response.ok){
+      const data=await response.json().catch(()=>({}));
+      throw new Error(data.error||"Could not load CV format.");
+    }
+    const blob=await response.blob();
+    if(blob.type!=="application/pdf")throw new Error("The server did not return a PDF.");
+    downloadPdfBlob(blob,"Ulas_Atilgan_UJob_Master_CV_Format.pdf");
+  }catch(error){
+    alert(error.message||"Could not download CV format.");
+  }finally{
+    button.disabled=false;button.textContent=old;
+  }
+}
+async function generateCv(key,button){
   const job=state.actions?.[key];
   if(!job||cvBusy.has(key))return;
   const card=button.closest(".action-job");
@@ -342,7 +362,7 @@ async function updateCv(key,button){
 
   cvBusy.add(key);
   button.disabled=true;
-  button.textContent="Updating CV…";
+  button.textContent="Generating CV…";
   if(statusEl)statusEl.textContent="Reading the vacancy and tailoring your CV from the saved base version…";
   try{
     const response=await apiFetch("/api/cv/generate",{
@@ -363,7 +383,7 @@ async function updateCv(key,button){
   }finally{
     cvBusy.delete(key);
     button.disabled=false;
-    button.textContent="Update CV";
+    button.textContent="Generate CV";
   }
 }
 
@@ -417,8 +437,8 @@ function bindMsControls(root){
   root.querySelectorAll("button[data-generate-ms]").forEach(button=>{
     button.addEventListener("click",()=>generateMs(button.dataset.generateMs,button));
   });
-  root.querySelectorAll("button[data-update-cv]").forEach(button=>{
-    button.addEventListener("click",()=>updateCv(button.dataset.updateCv,button));
+  root.querySelectorAll("button[data-generate-cv]").forEach(button=>{
+    button.addEventListener("click",()=>generateCv(button.dataset.generateCv,button));
   });
 }
 function addAskToWatchlist(job){
@@ -485,7 +505,7 @@ function renderActionResults(jobs){
       <h2 class="job-title"><a class="action-title-link" href="${esc(job.url)}" target="_blank" rel="noopener noreferrer">${esc(job.title)}</a></h2>
       <div class="job-meta">${esc(job.company)} · ${esc(job.location)}${job.publishedDate?` · Published ${esc(job.publishedDate)}`:""}</div>
       <div class="ms-tools">
-        <div class="doc-buttons"><button class="generate-ms" type="button" data-generate-ms="${esc(key)}"${busy?" disabled":""}>${busy?"Generating PDF…":"Generate MS"}</button><button class="update-cv" type="button" data-update-cv="${esc(key)}"${cvBusyNow?" disabled":""}>${cvBusyNow?"Updating CV…":"Update CV"}</button></div>
+        <div class="doc-buttons"><button class="generate-ms" type="button" data-generate-ms="${esc(key)}"${busy?" disabled":""}>${busy?"Generating PDF…":"Generate MS"}</button><button class="update-cv" type="button" data-generate-cv="${esc(key)}"${cvBusyNow?" disabled":""}>${cvBusyNow?"Generating CV…":"Generate CV"}</button></div>
         <div class="application-note-label">Application note · used for both MS and CV</div>
         <textarea class="ms-note" data-ms-note-key="${esc(key)}" maxlength="1200" rows="3" placeholder="Türkçe veya English yazabilirsin — örn. AI tarafımı öne çıkar, Hondinn'den bahsetme, investments ilgimi ekle…">${esc(note)}</textarea>
         <div class="ms-status" data-ms-status aria-live="polite"></div>
@@ -720,11 +740,12 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=54",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=55",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.primarySearch?.addEventListener("click",showSearchHome);
 els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
 els.actionsButton?.addEventListener("click",showActions);
+els.formatButton?.addEventListener("click",downloadMasterCvFormat);
 els.run.addEventListener("click",runSearch);
 els.historyToggle.addEventListener("click",()=>{const opening=els.history.hidden;els.history.hidden=!opening;els.historyToggle.setAttribute("aria-expanded",String(opening))});
 els.askButton?.addEventListener("click",()=>setAskOpen(Boolean(els.askPanel?.hidden)));
