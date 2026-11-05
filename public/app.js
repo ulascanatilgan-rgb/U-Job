@@ -843,7 +843,7 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=55",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=56",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.primarySearch?.addEventListener("click",showSearchHome);
 els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
@@ -856,8 +856,26 @@ els.askClose?.addEventListener("click",()=>setAskOpen(false));
 els.askRun?.addEventListener("click",analyzeAsk);
 els.askUrl?.addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();analyzeAsk()}});
 document.addEventListener("keydown",event=>{if(event.key==="Escape"&&!els.askPanel?.hidden)setAskOpen(false)});
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")resumePendingSearches()});
-window.addEventListener("focus",resumePendingSearches);
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"){
+    pullRemoteState().finally(resumePendingSearches);
+  }else if(syncReady){
+    pushRemoteState();
+  }
+});
+window.addEventListener("focus",()=>pullRemoteState().finally(resumePendingSearches));
 renderToday();setInterval(renderToday,60000);
-activeMode="search";activeView="search";state.activeMode="search";state.activeView="search";saveState();
-setDetailsOpen(false);setMode("search");renderAsk();checkHealth();resumePendingSearches();
+async function initUJob(){
+  await bootstrapSync();
+  activeMode="search";
+  activeView="search";
+  state.activeMode="search";
+  state.activeView="search";
+  syncLocalCache();
+  setDetailsOpen(false);
+  render();
+  renderAsk();
+  checkHealth();
+  resumePendingSearches();
+}
+initUJob();
