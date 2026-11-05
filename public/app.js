@@ -1,5 +1,5 @@
 const MODES={search:{title:"Search",hint:"Best 12 opportunities across every U-Job theme, ranked together."},reasonable:{title:"Reasonable",hint:"Realistic next-step roles across fintech, startups, investment/product, transformation and operations — aiming for 5-10 verified matches."},creative:{title:"Creative",hint:"Interior, renovation, finishing, workshop and hands-on project roles."},dogs:{title:"Dogs",hint:"Dog, pet and animal-sector roles where Hondinn gives you a real edge."},kapellen:{title:"Kapellen",hint:"Strong-fit jobs close to Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},startup:{title:"Startup",hint:"High-potential Belgian tech startups and scale-ups, Antwerp first."},familyoffice:{title:"Family O.",hint:"Family offices, family capital, owner offices and boutique investment/operations roles."},investment:{title:"Investment",hint:"Investment, wealth, research and economics roles matching your business + analytics + tech profile."},fintech:{title:"Fintech",hint:"Belgium fintech roles matched to your banking, operations and tech profile."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Power-track institutions, defence, EU/NATO, policy and international influence — up to 10 verified roles."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
-const STORAGE_KEY="ujob:data";const SYNC_MIGRATED_KEY="ujob:sync-migrated-v1";let syncReady=false;let syncRevision=0;let syncTimer=null;let syncInFlight=false;const SEARCH_TARGET=12;const SEARCH_FILL_MAX_ROUNDS=4;const DETAIL_MIN_TARGET=3;const DETAIL_FILL_MAX_ROUNDS=3;let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;let searchFillRound=0;let searchSessionJobs=[];const detailFillRounds={};const detailSessionJobs={};const msBusy=new Set();const cvBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",familyoffice:"",investment:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,familyoffice:null,investment:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
+const STORAGE_KEY="ujob:data";const SYNC_MIGRATED_KEY="ujob:sync-migrated-v2-watchlist-import";let syncReady=false;let syncRevision=0;let syncTimer=null;let syncInFlight=false;const SEARCH_TARGET=12;const SEARCH_FILL_MAX_ROUNDS=4;const DETAIL_MIN_TARGET=3;const DETAIL_FILL_MAX_ROUNDS=3;let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;let searchFillRound=0;let searchSessionJobs=[];const detailFillRounds={};const detailSessionJobs={};const msBusy=new Set();const cvBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",familyoffice:"",investment:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,familyoffice:null,investment:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
 function detailMinTargetFor(mode){return mode==="reasonable"?5:DETAIL_MIN_TARGET}
 function detailFillMaxRoundsFor(mode){return mode==="reasonable"?5:DETAIL_FILL_MAX_ROUNDS}
 const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory"),primarySearch:$("primarySearch"),primaryDetails:$("primaryDetails"),detailsPanel:$("detailsPanel"),formatButton:$("formatButton")};
@@ -607,31 +607,37 @@ async function pullRemoteState(){
 }
 async function bootstrapSync(){
   try{
+    // Keep the complete device-local state available for the one-time v2 import.
+    const localState=mergeState(emptyState(),state);
     const response=await apiFetch("/api/sync",{method:"GET"},12000);
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||"Could not start U-Job sync.");
     syncRevision=Number(data.revision||0);
-    const migrated=hasSyncMigrated();
-    if(data.state&&typeof data.state==="object"){
-      if(migrated){
-        state=mergeState(emptyState(),data.state);
-        syncLocalCache();
-      }else{
-        state=mergeState(mergeState(emptyState(),data.state),state);
-        syncLocalCache();
-        syncReady=true;
-        await pushRemoteState();
-        markSyncMigrated();
-        return;
-      }
-    }else{
+
+    if(!hasSyncMigrated()){
+      // One-time import per device: union existing mobile/desktop history + Watchlist
+      // into the central store before remote becomes authoritative.
+      state=data.state&&typeof data.state==="object"
+        ?mergeState(mergeState(emptyState(),data.state),localState)
+        :localState;
+      syncLocalCache();
       syncReady=true;
       await pushRemoteState();
       markSyncMigrated();
       return;
     }
+
+    // After the v2 import, central state is authoritative across devices.
+    if(data.state&&typeof data.state==="object"){
+      state=mergeState(emptyState(),data.state);
+      syncLocalCache();
+    }else{
+      state=localState;
+      syncReady=true;
+      await pushRemoteState();
+      return;
+    }
     syncReady=true;
-    markSyncMigrated();
   }catch(error){
     console.warn("U-Job sync bootstrap failed:",error);
     syncReady=true;
