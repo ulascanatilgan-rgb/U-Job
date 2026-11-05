@@ -1596,6 +1596,14 @@ const server = http.createServer(async (req, res) => {
       });
     }
 
+    if (req.method === "GET" && url.pathname === "/api/sync") {
+      return await getSyncedState(res);
+    }
+
+    if (req.method === "PUT" && url.pathname === "/api/sync") {
+      return await putSyncedState(req, res);
+    }
+
     if (req.method === "POST" && url.pathname === "/api/search/start") {
       return await startSearch(req, res);
     }
