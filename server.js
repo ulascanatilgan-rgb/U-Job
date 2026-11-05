@@ -161,6 +161,65 @@ async function readJson(req) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
+async function readSyncStore() {
+  try {
+    const raw = await readFile(SYNC_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") throw new Error("Invalid sync store.");
+    return {
+      revision: Number(parsed.revision || 0),
+      updatedAt: parsed.updatedAt || null,
+      state: parsed.state && typeof parsed.state === "object" ? parsed.state : null
+    };
+  } catch (error) {
+    if (error?.code === "ENOENT") return { revision: 0, updatedAt: null, state: null };
+    console.error("U-Job sync read error:", error);
+    return { revision: 0, updatedAt: null, state: null };
+  }
+}
+
+async function writeSyncStore(state, baseRevision) {
+  const task = async () => {
+    const current = await readSyncStore();
+    if (Number.isFinite(Number(baseRevision)) && Number(baseRevision) !== current.revision) {
+      return { conflict: true, current };
+    }
+    const next = {
+      revision: current.revision + 1,
+      updatedAt: new Date().toISOString(),
+      state
+    };
+    await mkdir(path.dirname(SYNC_FILE), { recursive: true });
+    await writeFile(SYNC_FILE, JSON.stringify(next), "utf8");
+    return { conflict: false, current: next };
+  };
+  const resultPromise = syncWriteQueue.then(task, task);
+  syncWriteQueue = resultPromise.then(() => undefined, () => undefined);
+  return resultPromise;
+}
+
+async function getSyncedState(res) {
+  const current = await readSyncStore();
+  return sendJson(res, 200, current);
+}
+
+async function putSyncedState(req, res) {
+  const body = await readJson(req);
+  if (!body?.state || typeof body.state !== "object" || Array.isArray(body.state)) {
+    return sendJson(res, 400, { error: "A valid U-Job state is required." });
+  }
+  const result = await writeSyncStore(body.state, body.baseRevision);
+  if (result.conflict) {
+    return sendJson(res, 409, {
+      error: "Sync conflict.",
+      revision: result.current.revision,
+      updatedAt: result.current.updatedAt,
+      state: result.current.state
+    });
+  }
+  return sendJson(res, 200, result.current);
+}
+
 function normalizeUrl(value) {
   try {
     const u = new URL(String(value));
