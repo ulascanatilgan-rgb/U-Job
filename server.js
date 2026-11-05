@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.8.0-cross-device-sync";
+const APP_VERSION = "4.9.0-pinned-reference-cv";
 const SYNC_FILE = process.env.UJOB_DATA_FILE || path.join(__dirname, "ujob-data.json");
 let syncWriteQueue = Promise.resolve();
 
@@ -1089,7 +1089,7 @@ function parseCvOutput(text) {
     hawkeyeInclude:yes("HAWKEYE_INCLUDE"),
     hawkeye:cleanGeneratedText(fields.HAWKEYE_1||""),
     internal:cleanGeneratedText(fields.INTERNAL_1||""),
-    interests:String(fields.INTERESTS||"").split("|").map(cleanGeneratedLabel).filter(Boolean).slice(0,6),
+    interests:String(fields.INTERESTS||"").split("|").map(cleanGeneratedLabel).filter(Boolean).slice(0,8),
     additional:[fields.ADDITIONAL_1,fields.ADDITIONAL_2].map(cleanGeneratedText).filter(Boolean).slice(0,2)
   };
 }
@@ -1195,7 +1195,7 @@ function buildTailoredCvPdf(cv,photo){
   const interests=(cv.interests&&cv.interests.length?cv.interests:["Macroeconomics","Financial markets","Geopolitics","International relations","Football","Padel"]);
   const interestRows=[];
   for(let i=0;i<interests.length;i+=2)interestRows.push(interests.slice(i,i+2).join(" · "));
-  for(const v of interestRows.slice(0,3))sy=sideLine(v,sy,6.45);
+  for(const v of interestRows.slice(0,4))sy=sideLine(v,sy,6.45);
 
   const additional=(cv.additional||[]).filter(Boolean);
   if(additional.length){
