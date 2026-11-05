@@ -57,8 +57,17 @@ function isRecentPublishedClient(job,maxDays=30){
   return Number.isFinite(age)&&age>=-1&&age<=maxDays+1;
 }
 function searchJobKey(job){
-  const url=String(job?.url||"").trim();
-  return url||((String(job?.company||"").trim().toLowerCase())+"|"+(String(job?.title||"").trim().toLowerCase()));
+  const norm=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
+  const company=norm(job?.company),title=norm(job?.title);
+  if(company&&title)return company+"|"+title;
+  try{
+    const u=new URL(String(job?.url||"").trim());
+    u.hash="";
+    ["utm_source","utm_medium","utm_campaign","utm_content","utm_term","src","source","ref"].forEach(k=>u.searchParams.delete(k));
+    return u.hostname.toLowerCase()+u.pathname.replace(/\/$/,"").toLowerCase();
+  }catch{
+    return String(job?.url||"").trim().toLowerCase();
+  }
 }
 function mergeSearchJobs(...lists){
   const map=new Map();
@@ -133,7 +142,11 @@ const RELATED_MODE_POOLS={
   turkish:["reasonable","fintech","corporate","startup","search"]
 };
 function candidateModesFor(mode){
-  return mode==="search"?Object.keys(MODES).filter(m=>m!=="search"):(RELATED_MODE_POOLS[mode]||["search","reasonable","startup","fintech"]);
+  if(mode==="search")return Object.keys(MODES).filter(m=>m!=="search");
+  if(mode==="reasonable")return RELATED_MODE_POOLS.reasonable;
+  // Details searches must stay category-pure. Their own prior runs can help dedupe,
+  // but other Details categories must not seed the search.
+  return [mode];
 }
 function collectCandidatePoolForMode(mode){
   const pool=[];
@@ -691,7 +704,9 @@ function completeModeSearch(mode,data){
   }
 
   if(mode!=="search"){
-    detailSessionJobs[mode]=mergeDetailJobs(mode,detailSessionJobs[mode]||[],jobs,collectTodayVerifiedRelatedJobs(mode));
+    detailSessionJobs[mode]=mode==="reasonable"
+      ?mergeDetailJobs(mode,detailSessionJobs[mode]||[],jobs,collectTodayVerifiedRelatedJobs(mode))
+      :mergeDetailJobs(mode,detailSessionJobs[mode]||[],jobs);
     jobs=detailSessionJobs[mode];
     state[mode].latest=jobs;
     state[mode].lastUpdate=at;
@@ -849,7 +864,7 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=56",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=58",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.primarySearch?.addEventListener("click",showSearchHome);
 els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
