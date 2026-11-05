@@ -1273,39 +1273,36 @@ function buildTailoredCvPdf(cv,photo){
 
 function masterCvData(){
   return {
-    headline:"Banking Operations | Investment Analytics & Technology",
+    headline:"Operations & Project Manager",
     profile:[
-      "Banking and fintech professional with 12+ years across operations, audit, governance and technology.",
-      "Analytically minded financial markets enthusiast following equities and macroeconomic trends.",
-      "Develops personal AI-assisted applications combining financial data, numerical analysis and technology."
+      "12+ years across banking operations, audit, controls, access governance, technology integration and project delivery.",
+      "Bridging business, strategy and technology through coordination, governance and execution.",
+      "Entrepreneurial, data-driven mindset with strong interest in financial markets, macroeconomics and international relations."
     ],
-    skills:["Financial Data & Analysis","Markets & Equity Research*","Risk, Governance & Controls","Technology & AI-Assisted Tools","Process & Data Improvement","Project & Change Delivery","Stakeholder Coordination","Operations & Reporting"],
-    ingDescriptor:"",
     ing:[
-      "Coordinate cross-functional operations in banking technology, connecting business, IT, risk and support teams to maintain reliable, controlled services.",
-      "Lead application onboarding, technology integrations and platform migrations while managing dependencies, priorities and operational risks.",
-      "Use governance, data and process reviews to identify gaps and drive improvements in controls, reporting and execution."
+      "Coordinate cross-department access operations across core banking technology environments.",
+      "Lead asset onboarding, application integration and technology transformation projects with business, IT, risk and support stakeholders.",
+      "Drive access governance, process optimisation and digitalisation across new applications, integrations and platform migrations."
     ],
     hondinnInclude:true,
-    hondinn:["Run my own service venture, managing pricing, financial tracking, customer operations and digital workflows."],
+    hondinn:[
+      "Built and manage a small-scale dog hotel from concept and property setup to compliance, client experience and daily operations.",
+      "Own booking flow, supplier coordination, marketing, financial follow-up and service quality control.",
+      "Apply entrepreneurial, data-driven decision-making to improve visibility, operations and commercial discipline."
+    ],
     audit:[
-      "Analysed banking activities, credit and operational risks, governance and controls; translated audit findings into clear recommendations.",
-      "Presented observations to senior stakeholders and monitored remediation progress and action plans."
+      "Managed audit projects across retail banking, credit risk, operational risk and governance.",
+      "Delivered data-driven process improvement recommendations to senior stakeholders."
     ],
     bpn:[
-      "Managed strategic, operational and compliance projects in a regulated fintech, supporting new activities and licensing preparation.",
-      "Coordinated with executives, regulators and external advisors, including PwC and KPMG."
+      "Managed business development and licensing preparation for new activities in a regulated fintech environment.",
+      "Coordinated C-level strategy communication and relationships with consultants and auditors including PwC and KPMG."
     ],
-    hawkeyeInclude:false,
-    hawkeye:"",
-    internal:"Reviewed branch and head-office processes across lending, compliance, banking operations and IT controls; tracked findings and remediation.",
-    digitalInclude:true,
-    digital:[
-      "UlasTrade - AI-assisted investment research tools: equity screening, earnings analysis, market monitoring and fundamental/technical research.",
-      "Independent financial-markets research across company financials, portfolio performance, macroeconomics and investment risk."
-    ],
-    additionalInclude:false,
-    additional:[]
+    hawkeyeInclude:true,
+    hawkeye:"Supported live match-day football technology systems at top-flight matches under high-pressure operational conditions.",
+    internal:"Conducted branch and HQ audits across lending, compliance, operations and IT controls; monitored corrective actions.",
+    interests:["Macroeconomics","Financial markets","Geopolitics","International relations","Football","Padel","Design","Travel"],
+    additional:["USTO Interior Finishing - usto.be","Independent Market Analysis - ulascanatilgan.com"]
   };
 }
 
