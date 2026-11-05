@@ -1,6 +1,6 @@
 import http from "http";
 import path from "path";
-import { readFile } from "fs/promises";
+import { readFile, writeFile, mkdir } from "fs/promises";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,7 +10,9 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.7.0-pinned-cv-format";
+const APP_VERSION = "4.8.0-cross-device-sync";
+const SYNC_FILE = process.env.UJOB_DATA_FILE || path.join(__dirname, "ujob-data.json");
+let syncWriteQueue = Promise.resolve();
 
 const MODES = {
   search: {
@@ -152,7 +154,7 @@ async function readJson(req) {
   let bytes = 0;
   for await (const chunk of req) {
     bytes += chunk.length;
-    if (bytes > 250000) throw new Error("Request too large.");
+    if (bytes > 5000000) throw new Error("Request too large.");
     chunks.push(chunk);
   }
   if (!chunks.length) return {};
