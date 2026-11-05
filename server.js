@@ -1132,7 +1132,7 @@ function buildBinaryPdf(objects){
 
 function buildTailoredCvPdf(cv,photo){
   const W=595.28,H=841.89,cmds=[];
-  const navy=[0.15,0.27,0.44], blue=[0.02,0.40,0.80], ink=[0.12,0.15,0.19], gray=[0.30,0.32,0.36];
+  const navy=[0.14,0.27,0.43], blue=[0.00,0.39,0.76], ink=[0.10,0.12,0.15], gray=[0.31,0.32,0.34], white=[1,1,1];
   const rgb=c=>c.join(" ");
   const text=(value,x,y,size=8,bold=false,color=ink)=>{
     cmds.push("BT /F"+(bold?2:1)+" "+size.toFixed(1)+" Tf "+rgb(color)+" rg 1 0 0 1 "+x.toFixed(1)+" "+y.toFixed(1)+" Tm ("+pdfEscape(value)+") Tj ET");
@@ -1140,85 +1140,117 @@ function buildTailoredCvPdf(cv,photo){
   const fill=(x,y,w,h,c)=>cmds.push(rgb(c)+" rg "+x+" "+y+" "+w+" "+h+" re f");
   const line=(x1,y1,x2,y2,c=blue,width=.7)=>cmds.push(rgb(c)+" RG "+width+" w "+x1+" "+y1+" m "+x2+" "+y2+" l S");
   const wrap=(value,chars)=>wrapPdfText(value,chars);
-  const bullet=(value,x,y,chars,size=7.25,color=gray)=>{
+  const bullet=(value,x,y,chars,size=7.25,color=gray,maxLines=3)=>{
     text("•",x,y,size,true,blue);
-    const lines=wrap(value,chars).slice(0,3);
+    const lines=wrap(value,chars).slice(0,maxLines);
     let yy=y;
-    for(const ln of lines){text(ln,x+10,yy,size,false,color);yy-=8.8;}
+    for(const ln of lines){text(ln,x+9,yy,size,false,color);yy-=8.8;}
     return yy;
   };
   const section=(label,x,y,w)=>{
-    text(label,x,y,8.7,true,navy);line(x,y-4,x+w,y-4,blue,.75);return y-14.5;
+    text(label,x,y,8.8,true,navy);
+    line(x,y-4,x+w,y-4,blue,.8);
+    return y-14.5;
   };
   const sideHeader=(label,y)=>{
-    text(label,37,y,8.5,true,[1,1,1]);line(37,y-5,158,y-5,[0.40,0.52,0.66],.45);return y-16.5;
+    text(label,37,y,8.35,true,white);
+    line(37,y-5,157,y-5,[0.38,0.51,0.65],.45);
+    return y-16.2;
   };
-  const sideLine=(value,y,size=6.85,bold=false)=>{
-    text(value,37,y,size,bold,[0.96,0.97,0.99]);return y-9.7;
+  const sideLine=(value,y,size=6.75,bold=false)=>{
+    text(value,37,y,size,bold,[0.96,0.97,0.99]);
+    return y-9.5;
   };
-  const role=(titleLine,dateLine,bullets,x,y)=>{
-    text(titleLine,x,y,8.25,true,ink);y-=10.5;
-    text(dateLine,x,y,7.1,false,blue);y-=9.8;
-    for(const b of bullets){y=bullet(b,x+3,y,72,7.05);y-=.4;}
-    return y-3.5;
+  const role=(title,dateLine,bullets,x,y,maxBullets=3)=>{
+    text(title,x,y,8.05,true,ink);
+    y-=10.2;
+    text(dateLine,x,y,7.0,false,blue);
+    y-=9.5;
+    for(const b of (bullets||[]).slice(0,maxBullets)){
+      y=bullet(b,x+3,y,73,7.0,gray,3);
+      y-=.2;
+    }
+    return y-3.1;
   };
 
+  // Pinned reference layout: dark fixed sidebar + compact main column.
   fill(24,22,151,797,navy);
   cmds.push("q 105 0 0 101.6 50 683 cm /Im1 Do Q");
 
-  let sy=666;
+  let sy=665;
   sy=sideHeader("CONTACT",sy);
-  for(const v of ["Kapellen, Belgium","+32 478 66 19 13","ulascanatilgan@gmail.com","ulascanatilgan.com","linkedin.com/in/ulascntlgn"])sy=sideLine(v,sy,6.75);
-  sy-=5;sy=sideHeader("LANGUAGES",sy);
-  for(const v of ["English - Professional","Turkish - Native","Dutch - B1","French - A2"])sy=sideLine(v,sy);
-  sy-=4;sy=sideHeader("CITIZENSHIP",sy);
-  sy=sideLine("Belgian & Turkish",sy);sy=sideLine("EU work authorisation",sy);
-  sy-=4;sy=sideHeader("CERTIFICATIONS",sy);
-  for(const v of ["CIA - Internal Auditor","CISA - Information Systems","CFE - Fraud Examiner","CFSA - Financial Services","CML 3 - Capital Markets (TR)","CIAM - Identity & Access Mgmt"])sy=sideLine(v,sy,6.45);
-  sy-=4;sy=sideHeader("CORE SKILLS",sy);
-  for(const v of cv.skills.slice(0,8))sy=sideLine(v,sy,6.55);
-  sy-=4;sy=sideHeader("ONLINE",sy);
-  sy=sideLine("Professional / project portfolio:",sy,6.35);
-  sy=sideLine("ulascanatilgan.com",sy,6.55);
-  if(cv.hondinnInclude)sy=sideLine("Business venture: Hondinn",sy,6.35);
-  if(cv.hawkeyeInclude)sy=sideLine("Earlier: Hawk-Eye / Sony (2018-19)",sy,6.15);
+  for(const v of ["Kapellen, Belgium","+32 478 66 19 13","ulascanatilgan@gmail.com","ulascanatilgan.com","linkedin.com/in/ulascntlgn"])sy=sideLine(v,sy,6.7);
 
-  const x=192,right=565,rw=right-x;
-  text("ULAS ATILGAN",x,793,19.2,true,navy);
-  text(cv.headline,x,772,10.2,false,blue);
+  sy-=4; sy=sideHeader("LANGUAGES",sy);
+  for(const v of ["English - Professional","Turkish - Native","Dutch - B1","French - A2"])sy=sideLine(v,sy);
+
+  sy-=4; sy=sideHeader("CITIZENSHIP",sy);
+  sy=sideLine("Belgian & Turkish",sy);
+  sy=sideLine("No work sponsorship required (EU)",sy,6.35);
+
+  sy-=4; sy=sideHeader("CERTIFICATIONS",sy);
+  for(const v of ["CIA - Certified Internal Auditor","CISA - Information Systems Auditor","CFE - Certified Fraud Examiner","CFSA - Financial Services Auditor","CML 3 - Capital Markets (TR)","CIAM - Identity & Access Management"])sy=sideLine(v,sy,6.15);
+
+  sy-=4; sy=sideHeader("INTERESTS",sy);
+  const interests=(cv.interests&&cv.interests.length?cv.interests:["Macroeconomics","Financial markets","Geopolitics","International relations","Football","Padel"]);
+  const interestRows=[];
+  for(let i=0;i<interests.length;i+=2)interestRows.push(interests.slice(i,i+2).join(" · "));
+  for(const v of interestRows.slice(0,3))sy=sideLine(v,sy,6.45);
+
+  const additional=(cv.additional||[]).filter(Boolean);
+  if(additional.length){
+    sy-=4; sy=sideHeader("ADDITIONAL",sy);
+    for(const v of additional.slice(0,2))sy=sideLine(v,sy,6.4,true);
+  }
+
+  const x=190,right=562,rw=right-x;
+  text("ULAS ATILGAN",x,793,19.0,true,navy);
+  text(cv.headline||"Operations & Project Manager",x,772,10.2,false,blue);
 
   let y=747;
   y=section("PROFILE",x,y,rw);
-  const profileText=cv.profile.join(" ");
-  for(const ln of wrap(profileText,91).slice(0,5)){text(ln,x,y,7.65,false,gray);y-=9.2;}
-  y-=4;
+  for(const p of (cv.profile||[]).slice(0,3)){
+    y=bullet(p,x+3,y,77,7.2,gray,2);
+    y-=.4;
+  }
+  y-=2.5;
 
   y=section("PROFESSIONAL EXPERIENCE",x,y,rw);
-  const ingTitle="Access Operations Manager - ING Belgium"+(cv.ingDescriptor?" | "+cv.ingDescriptor:"");
-  y=role(ingTitle,"2020 - Present | Brussels, Belgium",cv.ing.slice(0,3),x,y);
-  if(cv.hondinnInclude&&cv.hondinn.length)y=role("Business Manager (own venture) - Hondinn","2023 - Present | Kapellen, Belgium",cv.hondinn.slice(0,2),x,y);
-  y=role("Corporate Audit Services - ING Belgium","2019 - 2020 | Brussels, Belgium",cv.audit.length?cv.audit.slice(0,2):["Coordinated assurance workstreams, senior-stakeholder findings and remediation across banking and operational functions."],x,y);
-  y=role("Project & Control Manager - BPN Payment & E-money Institution","2017 - 2019 | Istanbul, Turkey",cv.bpn.slice(0,2),x,y);
-  if(cv.hawkeyeInclude&&cv.hawkeye)y=role("Football Systems Consultant (part-time) - Hawk-Eye Innovations (Sony)","2018 - 2019 | Turkey",[cv.hawkeye],x,y);
-  y=role("Internal Auditor - Akbank / Denizbank","2014 - 2017 | Istanbul, Turkey",[cv.internal||"Delivered operational, compliance, lending and IT-control reviews; documented findings and tracked remediation."],x,y);
+  y=role("Access Operations Manager - ING Belgium","2020 - Present | Brussels, Belgium",cv.ing,x,y,3);
 
-  const projectLines=[...(cv.digitalInclude?cv.digital:[]),...(cv.additionalInclude?cv.additional:[])].filter(Boolean).slice(0,4);
-  if(projectLines.length&&y>120){
-    y=section(cv.digitalInclude?"SELECTED PROJECTS & ANALYTICS":"SELECTED PROJECTS",x,y,rw);
-    for(const p of projectLines){y=bullet(p,x+3,y,72,7.05);y-=1;}
-    y-=2;
+  if(cv.hondinnInclude&&cv.hondinn?.length){
+    y=role("Business Manager - Hondinn (own venture) | boutique dog hotel","2023 - Present | Kapellen, Belgium",cv.hondinn,x,y,3);
   }
 
-  y=Math.max(y,78);
+  y=role("Corporate Audit Services - ING Belgium","2019 - 2020 | Brussels, Belgium",cv.audit?.length?cv.audit:[
+    "Managed audit projects across banking operations, credit risk, operational risk and governance.",
+    "Delivered data-driven recommendations and monitored remediation with senior stakeholders."
+  ],x,y,2);
+
+  y=role("Project & Control Manager - BPN Payment & E-money Institution","2017 - 2019 | Istanbul, Turkey",cv.bpn,x,y,2);
+
+  if(cv.hawkeyeInclude&&cv.hawkeye){
+    y=role("Football Systems Consultant (part-time) - Hawk-Eye Innovations (Sony)","2018 - 2019 | Turkey",[cv.hawkeye],x,y,1);
+  }
+
+  y=role("Internal Auditor - Akbank / Denizbank","2014 - 2017 | Istanbul, Turkey",[cv.internal||"Conducted branch and HQ audits across lending, compliance, operations and IT controls; monitored corrective actions."],x,y,1);
+
+  y-=1;
   y=section("EDUCATION",x,y,rw);
   const edu=[
-    "M.Sc. Information Technology - Sabanci University, 2018",
-    "B.Sc. Business Administration - TOBB University, 2014",
-    "B.Sc. International Relations (Double Major) - TOBB University, 2015",
-    "Exchange, International Business - Hogeschool Utrecht, 2012"
+    ["M.Sc. Information Technology","Sabanci University, Istanbul (2018)"],
+    ["B.Sc. Business Administration","TOBB University, Ankara (2014)"],
+    ["B.Sc. International Relations (Double Major)","TOBB University, Ankara (2015)"],
+    ["Exchange Student, International Business","Hogeschool Utrecht (2012)"]
   ];
-  for(const e of edu){text(e,x,y,6.95,e.startsWith("M.Sc.")||e.startsWith("B.Sc."),ink);y-=8.8;}
-  if(y<30)throw new Error("Tailored CV content is too long for the one-page master format.");
+  for(const [degree,school] of edu){
+    text(degree+" -",x,y,6.8,true,ink);
+    const offset=Math.min(190,Math.max(92,degree.length*3.55+9));
+    text(school,x+offset,y,6.75,false,gray);
+    y-=9.1;
+  }
+
+  if(y<26)throw new Error("Tailored CV content is too long for the one-page reference format.");
 
   const stream=cmds.join("\n");
   const imageObject=Buffer.concat([
