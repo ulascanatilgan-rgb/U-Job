@@ -1076,25 +1076,20 @@ function parseCvOutput(text) {
     if(i<=0)continue;
     fields[line.slice(0,i).trim().toUpperCase()]=cleanGeneratedText(line.slice(i+1).trim());
   }
-  const skills=String(fields.SKILLS||"").split("|").map(cleanGeneratedLabel).filter(Boolean).slice(0,8);
-  if(!fields.HEADLINE||!fields.PROFILE_1||!fields.ING_1||skills.length<6)throw new Error("Could not create a valid tailored CV.");
+  if(!fields.HEADLINE||!fields.PROFILE_1||!fields.ING_1)throw new Error("Could not create a valid tailored CV.");
   const yes=k=>String(fields[k]||"").toUpperCase()==="YES";
   return {
     headline:cleanGeneratedLabel(fields.HEADLINE),
     profile:[fields.PROFILE_1,fields.PROFILE_2,fields.PROFILE_3].map(cleanGeneratedText).filter(Boolean).slice(0,3),
-    skills,
-    ingDescriptor:cleanGeneratedLabel(fields.ING_DESCRIPTOR||""),
     ing:[fields.ING_1,fields.ING_2,fields.ING_3].map(cleanGeneratedText).filter(Boolean).slice(0,3),
     hondinnInclude:yes("HONDINN_INCLUDE"),
-    hondinn:[fields.HONDINN_1,fields.HONDINN_2].map(cleanGeneratedText).filter(Boolean).slice(0,2),
+    hondinn:[fields.HONDINN_1,fields.HONDINN_2,fields.HONDINN_3].map(cleanGeneratedText).filter(Boolean).slice(0,3),
     audit:[fields.AUDIT_1,fields.AUDIT_2].map(cleanGeneratedText).filter(Boolean).slice(0,2),
     bpn:[fields.BPN_1,fields.BPN_2].map(cleanGeneratedText).filter(Boolean).slice(0,2),
     hawkeyeInclude:yes("HAWKEYE_INCLUDE"),
     hawkeye:cleanGeneratedText(fields.HAWKEYE_1||""),
     internal:cleanGeneratedText(fields.INTERNAL_1||""),
-    digitalInclude:yes("DIGITAL_INCLUDE"),
-    digital:[fields.DIGITAL_1,fields.DIGITAL_2].map(cleanGeneratedText).filter(Boolean).slice(0,2),
-    additionalInclude:yes("ADDITIONAL_INCLUDE"),
+    interests:String(fields.INTERESTS||"").split("|").map(cleanGeneratedLabel).filter(Boolean).slice(0,6),
     additional:[fields.ADDITIONAL_1,fields.ADDITIONAL_2].map(cleanGeneratedText).filter(Boolean).slice(0,2)
   };
 }
