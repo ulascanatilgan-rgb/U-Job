@@ -535,6 +535,109 @@ function renderHistory(runs,mode){
   </div>`).join("");
   bindAppliedControls(els.history);
 }
+function syncLocalCache(){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch{}
+}
+function markSyncMigrated(){
+  try{localStorage.setItem(SYNC_MIGRATED_KEY,"1")}catch{}
+}
+function hasSyncMigrated(){
+  try{return localStorage.getItem(SYNC_MIGRATED_KEY)==="1"}catch{return false}
+}
+function scheduleRemoteSave(delay=350){
+  if(!syncReady)return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(()=>pushRemoteState(),delay);
+}
+async function pushRemoteState(){
+  if(!syncReady||syncInFlight)return;
+  syncInFlight=true;
+  clearTimeout(syncTimer);
+  syncTimer=null;
+  try{
+    const response=await apiFetch("/api/sync",{
+      method:"PUT",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({baseRevision:syncRevision,state})
+    },15000);
+    const data=await response.json().catch(()=>({}));
+    if(response.status===409&&data.state){
+      syncRevision=Number(data.revision||0);
+      state=mergeState(mergeState(emptyState(),data.state),state);
+      syncLocalCache();
+      const retry=await apiFetch("/api/sync",{
+        method:"PUT",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({baseRevision:syncRevision,state})
+      },15000);
+      const retryData=await retry.json().catch(()=>({}));
+      if(retry.ok)syncRevision=Number(retryData.revision||syncRevision);
+      return;
+    }
+    if(!response.ok)throw new Error(data.error||"Could not sync U-Job.");
+    syncRevision=Number(data.revision||syncRevision);
+  }catch(error){
+    console.warn("U-Job sync push failed:",error);
+    if(syncReady)scheduleRemoteSave(5000);
+  }finally{
+    syncInFlight=false;
+  }
+}
+async function pullRemoteState(){
+  if(syncInFlight)return;
+  syncInFlight=true;
+  try{
+    const response=await apiFetch("/api/sync",{method:"GET"},12000);
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||"Could not load synced U-Job data.");
+    syncRevision=Number(data.revision||0);
+    if(data.state&&typeof data.state==="object"){
+      state=mergeState(emptyState(),data.state);
+      activeMode=state.activeMode&&MODES[state.activeMode]?state.activeMode:"search";
+      activeView=state.activeView==="actions"?"actions":(MODES[state.activeView]?state.activeView:activeMode);
+      syncLocalCache();
+      renderAsk();
+      render();
+    }
+  }catch(error){
+    console.warn("U-Job sync pull failed:",error);
+  }finally{
+    syncInFlight=false;
+  }
+}
+async function bootstrapSync(){
+  try{
+    const response=await apiFetch("/api/sync",{method:"GET"},12000);
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||"Could not start U-Job sync.");
+    syncRevision=Number(data.revision||0);
+    const migrated=hasSyncMigrated();
+    if(data.state&&typeof data.state==="object"){
+      if(migrated){
+        state=mergeState(emptyState(),data.state);
+        syncLocalCache();
+      }else{
+        state=mergeState(mergeState(emptyState(),data.state),state);
+        syncLocalCache();
+        syncReady=true;
+        await pushRemoteState();
+        markSyncMigrated();
+        return;
+      }
+    }else{
+      syncReady=true;
+      await pushRemoteState();
+      markSyncMigrated();
+      return;
+    }
+    syncReady=true;
+    markSyncMigrated();
+  }catch(error){
+    console.warn("U-Job sync bootstrap failed:",error);
+    syncReady=true;
+  }
+}
+
 async function apiFetch(url, options={}, timeoutMs=15000){
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),timeoutMs);
