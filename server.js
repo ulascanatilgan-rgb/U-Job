@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "4.9.0-pinned-reference-cv";
+const APP_VERSION = "5.0.0-detail-taxonomy";
 const SYNC_FILE = process.env.UJOB_DATA_FILE || path.join(__dirname, "ujob-data.json");
 let syncWriteQueue = Promise.resolve();
 
@@ -37,8 +37,8 @@ const MODES = {
   },
   kapellen: {
     label: "Kapellen",
-    geography: "Local-only: Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren; also Hoevenen, Mariaburg and Antwerp-North/Merksem only when the commute is clearly local to Kapellen. Do not return Brussels, Ghent, Leuven or distant Belgium roles.",
-    focus: "Find realistic nearby roles where this candidate can compete strongly and improve day-to-day quality of life through a short commute. Search across sectors rather than forcing one industry: Business/Operations Manager, Project/Programme Coordinator or Manager, Business Manager, Customer/Client Operations, Implementation, Partnerships, process/office operations, banking/financial services, fintech/payments, technology/security governance, logistics/port operations, premium service businesses, interior/renovation/project operations and entrepreneurial SME roles. Use 12+ years of banking/audit/fraud/control/IAM/security, stakeholder/project management, analytics, entrepreneurship, AI/automation and hands-on renovation experience. Prefer ownership, people contact, international or English-friendly environments and meaningful responsibility. Reject retail-store jobs, generic administrative work, junior roles, repetitive back-office work and positions with mandatory professional Dutch/French."
+    geography: "STRICT LOCAL ONLY: Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren and Hoevenen. Do not return central Antwerp, Merksem, Brussels, Ghent, Leuven, Mechelen or any role whose actual workplace is outside this northern-Antwerp area. Hybrid is acceptable only when the listed base/workplace itself is in this area.",
+    focus: "This is a geographically local hidden-gems search, not a copy of Corporate or Reasonable. Find strong English-sufficient opportunities within the strict local area that fit this candidate's broad operator profile: prestigious or discreet family offices and owner offices, family-owned holdings and SMEs, premium local businesses, entrepreneurial companies, creative/interior/renovation/property firms, automotive/marine/luxury businesses, specialist services, logistics/port-adjacent businesses, technology firms and high-quality local employers. Prioritise Business/Operations Manager, Chief of Staff/right-hand, Project/Programme Manager, Business Manager, Client/Customer Operations, Partnerships, Office/Commercial Operations, Estate/Property Operations and broad owner-facing roles. Use banking/audit/control/IAM, stakeholder/project management, entrepreneurship/Hondinn, AI/automation and USTO/interior experience as transferable evidence. English must genuinely be sufficient. Reject generic retail, low-skill hospitality, repetitive administration, narrow back-office work, junior roles and mandatory professional Dutch/French. Quality over quantity: return fewer roles if the local market is thin."
   },
   corporate: {
     label: "Corporate",
@@ -72,8 +72,8 @@ const MODES = {
   },
   prestige: {
     label: "Prestige",
-    geography: "Belgium first, especially Brussels and internationally connected institutions. If Belgium does not yield enough exceptional matches, allow other EU member states only for unusually strong English-speaking roles with clear EU-citizen eligibility and major prestige/career leverage.",
-    focus: "Institutional power-track roles with international prestige, senior stakeholder exposure, visible responsibility and upward mobility. Search European Defence Agency, NATO and NATO bodies/agencies, EU institutions and agencies, European Commission, European Parliament, Council/EEAS-related bodies, central banks and financial-policy institutions, defence/security institutions, Belgian and allied defence ministries where civilian vacancies are public, embassies and diplomatic missions in Belgium, permanent representations, international organisations, chambers of commerce, banking/financial federations, major trade associations, geopolitical/security organisations, respected think tanks, policy institutes, public-affairs organisations and other high-reputation institutions. Prioritise professional roles such as Programme/Project Officer or Manager, Business/Operations Manager, Policy/Programme Advisor, Institutional Relations, Stakeholder Relations, Strategic Partnerships, Security Governance, Financial Services Policy, Regulatory Strategy, EU/Public Affairs, Government Affairs, Geopolitical/Strategic Risk, Transformation, Digital/Technology Programme roles and operational policy implementation. Use the candidate's Belgian/EU citizenship, International Relations degree, ING/banking background, audit/fraud/control experience, IAM/security/technology knowledge, operations, stakeholder management and certifications as transferable strengths. Candidate is 35 years old: reject age-limited traineeships, graduate schemes or young-professional programmes where 35 is ineligible, but do not treat age as a negative when no age restriction exists. Belgian-nationality or EU-nationality requirements are acceptable because the candidate is Belgian/EU. Reject only genuine blockers such as sworn military/police status, specialist legal/doctoral requirements, an already-active clearance when mandatory before application, or mandatory professional Dutch/French that cannot be substituted by English."
+    geography: "Belgium first, especially Brussels and internationally connected institutions. Other EU member states only for unusually strong English-speaking roles with clear EU-citizen eligibility and substantially higher institutional prestige or career leverage.",
+    focus: "STRICT PRESTIGE MODE. Return only roles whose employer itself carries clear institutional, policy, diplomatic, defence/security, international-organisational or elite public-affairs reputation AND where the role can materially improve the candidate's network, credibility, influence or future options. Prioritise EU institutions/agencies, NATO and NATO bodies, European Defence Agency, EEAS, European Commission/Parliament/Council ecosystems, central banks and financial-policy bodies, major international organisations, embassies/permanent representations, respected defence/security institutions, top-tier policy institutes/think tanks, major banking/financial federations and genuinely influential trade/public-affairs organisations. Roles should involve programme/project management, operations/business management, policy implementation, institutional/stakeholder relations, strategic partnerships, security governance, financial-services policy/regulatory strategy, transformation or digital/technology programmes. Do not include ordinary private-company roles merely because the company is famous. Do not pad with generic associations or low-impact coordinator/admin roles. Use Belgian/EU citizenship, International Relations, banking/audit/control/IAM/security, operations and stakeholder management as transferable strengths. Candidate is 35: reject age-limited programmes where ineligible. Reject specialist legal/doctoral/military requirements, mandatory pre-existing clearance, or mandatory professional Dutch/French."
   },
   highpaid: {
     label: "High Paid",
@@ -486,6 +486,7 @@ LANGUAGE_CHECK: English sufficient; no other language mandatory.
 AGE_CHECK: ${mode === "prestige" ? "Eligible at age 35; explicit age rule checked: ..." : "N/A"}
 REMOTE_CHECK: ${mode === "global" ? "Belgium/Europe/EMEA eligibility verified: ..." : "N/A"}
 MOBILITY_CHECK: ${mode === "swmo" ? "Belgian/EU-citizen eligibility: ..." : "N/A"}
+MODE_CHECK: ${mode.toUpperCase()}_MATCH | explain in one short sentence why this vacancy belongs specifically in this selected Details category
 SCORE: 8.7
 WHY_FIT_1: ...
 WHY_FIT_2: ...
@@ -530,6 +531,7 @@ function parseVerifiedJobs(text) {
       ageCheck: fields.AGE_CHECK || "",
       remoteCheck: fields.REMOTE_CHECK || "",
       mobilityCheck: fields.MOBILITY_CHECK || "",
+      modeCheck: fields.MODE_CHECK || "",
       score: Number.isFinite(score) ? score : 0,
       whyFit
     });
@@ -544,14 +546,15 @@ function buildStrictPrompt(prompt, mode) {
 FINAL CHECK BEFORE OUTPUT
 - Re-open/check each final vacancy or ATS/recruiter page in this same run. Do not rely on search snippets, cached pages or old indexed copies.
 - Exact date + currently accepting applications + direct vacancy URL + visible application path are mandatory. OPEN_CHECK must explicitly confirm the page was re-opened today.
-- MATCH_CHECK is mandatory: output NO_HARD_GAP only after checking the vacancy must-haves against the candidate. Reject roles with a hard specific-experience gap.
+- MATCH_CHECK is mandatory: output NO_HARD_GAP only after checking the vacancy must-haves against the candidate.
+- MODE_CHECK is mandatory. It must start with the exact token for the selected mode (for example KAPELLEN_MATCH or PRESTIGE_MATCH). Reject a role if it merely fits another Details category better. Reject roles with a hard specific-experience gap.
 - ING / ING Bank / ING Belgium / ING Group vacancies are forbidden in every mode.
 - English must be sufficient; mandatory Dutch/French rejects the role. SW-MO also rejects mandatory German/Italian.
 - LinkedIn: <=7 days and LinkedIn job URL.
 - Global: <=30 days and explicit Belgium/EU/Europe/EMEA remote eligibility.
 - SW-MO: <=30 days and realistic Belgian/EU-citizen mobility.
-- PRESTIGE: candidate is Belgian/EU citizen, age 35. Check explicit age/nationality/clearance/status rules. Reject only if a real rule makes the candidate ineligible; Belgian/EU-nationality requirements are acceptable.
-- KAPELLEN: final location must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or a clearly local adjacent northern-Antwerp location named in the mode geography.
+- PRESTIGE: employer and role must both pass a genuine prestige test: institutional reputation + meaningful responsibility + future career leverage. Ordinary private-company jobs, generic associations and low-impact admin/coordinator roles do not qualify. Candidate is Belgian/EU citizen, age 35; check explicit age/nationality/clearance/status rules.
+- KAPELLEN: final listed workplace must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or Hoevenen. No central Antwerp/Brussels fallback. Search local family offices, owner-led SMEs, premium/creative/property/interior/automotive/marine businesses and strong local employers before generic corporate roles.
 - CREATIVE: seek distinctive premium/lifestyle/heritage environments (clubs, yachts, classic/performance cars, tailoring, watches, estates, private aviation, boutique hospitality, wine/spirits, design/interiors). Reject generic retail/hospitality filler and hands-on trade jobs requiring qualifications the candidate lacks.
 - DOGS: final employer must be genuinely dog/pet/animal-sector related; English sufficient; reject mandatory professional Dutch/French and low-skill animal-care filler roles.
 - ${(mode === "search" || mode === "reasonable" || mode === "prestige") ? (mode === "search" ? "Search: cover all Details themes, rank them together and return up to 12 excellent roles." : mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: search all fallback waves and aim for 5-10 credible roles, maximum 10; do not stop after a narrow fintech pass.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
@@ -668,6 +671,11 @@ function finalizeJobsFromResponse(data, mode = "") {
     .filter(job => mode !== "swmo" || hasRealisticSwmoMobility(job))
     .filter(job => mode !== "kapellen" || isKapellenArea(job))
     .filter(job => {
+      if (!mode || mode === "search") return true;
+      const expected = mode.toUpperCase().replace(/[^A-Z0-9]+/g,"_")+"_MATCH";
+      return String(job.modeCheck||"").toUpperCase().startsWith(expected);
+    })
+    .filter(job => {
       if (mode !== "prestige") return true;
       const age = String(job.ageCheck || "");
       if (!age) return false;
@@ -683,7 +691,8 @@ function finalizeJobsFromResponse(data, mode = "") {
       return /english/i.test(lang) && !languagePattern.test(cleaned);
     })
     .filter(job => {
-      const key = `${job.company.toLowerCase()}|${job.title.toLowerCase()}`;
+      const norm=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");
+      const key = norm(job.company)+"|"+norm(job.title);
       if (duplicates.has(key)) return false;
       duplicates.add(key);
       return true;
