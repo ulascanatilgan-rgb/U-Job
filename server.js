@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "5.0.0-detail-taxonomy";
+const APP_VERSION = "5.1.0-fast-efficient-search";
 const SYNC_FILE = process.env.UJOB_DATA_FILE || path.join(__dirname, "ujob-data.json");
 let syncWriteQueue = Promise.resolve();
 
@@ -38,7 +38,7 @@ const MODES = {
   kapellen: {
     label: "Kapellen",
     geography: "STRICT LOCAL ONLY: Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren and Hoevenen. Do not return central Antwerp, Merksem, Brussels, Ghent, Leuven, Mechelen or any role whose actual workplace is outside this northern-Antwerp area. Hybrid is acceptable only when the listed base/workplace itself is in this area.",
-    focus: "This is a geographically local hidden-gems search, not a copy of Corporate or Reasonable. Find strong English-sufficient opportunities within the strict local area that fit this candidate's broad operator profile: prestigious or discreet family offices and owner offices, family-owned holdings and SMEs, premium local businesses, entrepreneurial companies, creative/interior/renovation/property firms, automotive/marine/luxury businesses, specialist services, logistics/port-adjacent businesses, technology firms and high-quality local employers. Prioritise Business/Operations Manager, Chief of Staff/right-hand, Project/Programme Manager, Business Manager, Client/Customer Operations, Partnerships, Office/Commercial Operations, Estate/Property Operations and broad owner-facing roles. Use banking/audit/control/IAM, stakeholder/project management, entrepreneurship/Hondinn, AI/automation and USTO/interior experience as transferable evidence. English must genuinely be sufficient. Reject generic retail, low-skill hospitality, repetitive administration, narrow back-office work, junior roles and mandatory professional Dutch/French. Quality over quantity: return fewer roles if the local market is thin."
+    focus: "LOCAL PREMIUM ARTISAN / ATELIER MODE. This category should feel materially different from Corporate. Search the local affluent northern-Antwerp market for niche, productive, hands-on and craft-adjacent work where the candidate can combine USTO/interior-finishing experience, entrepreneurship, project/operations discipline and client handling. Strong targets include bespoke interiors, cabinetry/joinery, custom furniture, interior finishing, decorative painting and premium surfaces, restoration, workshop/atelier operations, premium renovation/property services, kitchen/interior studios, yacht or marine interiors, classic/performance-car restoration/detailing/workshop operations, specialist automotive, artisan manufacturing, premium home services, design-build firms, family-owned ateliers, owner-led SMEs, boutique family offices/estate operations and discreet businesses serving high-income clients in Kapellen/Brasschaat/Kalmthout. Prioritise Workshop/Operations Manager, Project Coordinator/Manager, Production or Planning Coordinator, Client/Project Advisor, Showroom/Commercial Operations, Owner/Founder right-hand, Business Manager, Estate/Property Operations and hands-on project roles where a formal master-craft qualification is NOT a hard requirement. Search actual local employers and ateliers, not only large job boards. English must genuinely be sufficient; Dutch may be optional/preferred but not mandatory. Reject generic retail, low-skill hospitality, repetitive administration, narrow back-office jobs and craft roles requiring a qualification the candidate does not have. If the market is thin, keep the strongest recent verified local roles visible rather than padding with unrelated corporate vacancies."
   },
   corporate: {
     label: "Corporate",
@@ -392,9 +392,9 @@ function buildPrompt(mode, seenUrls, candidatePool = []) {
     ? pool.map((job,i) => (i+1)+". ["+(job.sourceMode||"detail")+"] "+job.title+" | "+job.company+" | "+job.location+" | "+job.publishedDate+" | prior score "+job.score+" | "+job.url).join("\n")
     : "None.";
   const maxAge = mode === "linkedin" ? 7 : 30;
-  const target = mode === "search" ? 36 : mode === "reasonable" ? 20 : mode === "prestige" ? 15 : mode === "creative" ? 12 : mode === "kapellen" ? 10 : (mode === "investment" || mode === "fintech" || mode === "startup" || mode === "familyoffice" || mode === "dogs" || mode === "global" || mode === "swmo") ? 9 : 7;
-  const finalTarget = mode === "search" ? "10-12" : mode === "reasonable" ? "5-10" : mode === "prestige" ? "6-10" : "3-5";
-  const stopAt = mode === "search" ? 12 : (mode === "reasonable" || mode === "prestige") ? 10 : 5;
+  const target = mode === "search" ? 14 : mode === "reasonable" ? 10 : mode === "prestige" ? 10 : mode === "creative" ? 8 : mode === "kapellen" ? 8 : 7;
+  const finalTarget = mode === "search" ? "6-8" : mode === "reasonable" ? "4-6" : mode === "prestige" ? "4-6" : "3-5";
+  const stopAt = mode === "search" ? 8 : (mode === "reasonable" || mode === "prestige") ? 6 : 5;
 
   const special = mode === "linkedin"
     ? "LINKEDIN: LinkedIn job pages only; <=7 days; final URL must be the LinkedIn vacancy."
@@ -405,7 +405,7 @@ function buildPrompt(mode, seenUrls, candidatePool = []) {
         : mode === "prestige"
           ? "PRESTIGE: Belgium first. Candidate is Belgian/EU citizen and age 35. Belgian/EU-nationality requirements are acceptable. Reject only if an explicit age cap makes age 35 ineligible, or another hard eligibility requirement is not met. AGE_CHECK is mandatory."
           : mode === "kapellen"
-            ? "KAPELLEN: final location must be in the specified local area. English must be sufficient; Dutch may be optional/preferred but not mandatory."
+            ? "KAPELLEN: use artisan/atelier/local-premium discovery terms: bespoke interior, cabinetry, joinery, furniture, interior finishing, decorative surfaces, restoration, classic car, detailing, workshop, atelier, yacht/marine interior, premium renovation, estate/property, design-build, owner-led SME, family business. Final location must be in the specified local area. English sufficient; Dutch optional/preferred only."
             : mode === "reasonable"
               ? "REASONABLE: fintech first, but this is a realistic-career-match mode rather than a sector purity test. Continue into adjacent startup, investment/product, AI/transformation, corporate operations and local-business waves until a useful result set exists."
             : mode === "fintech"
@@ -431,8 +431,8 @@ GEOGRAPHY: ${cfg.geography}
 ${special}
 
 SEARCH PLAN
-- Discover about ${target} serious candidates, then return the best ${finalTarget}. Stop once ${stopAt} strong verified roles are found.
-- Use ONLY the focused source plan below. Start each wave with one broad discovery query, then targeted verification. Avoid equivalent/repeated queries and do not re-search the same domain without a reason.
+- COST DISCIPLINE: discover at most about ${target} serious candidates and stop as soon as ${stopAt} strong verified roles are found. Do not keep browsing once enough qualified roles exist. Return the best ${finalTarget}.
+- Use a maximum of 3 focused discovery waves for this mode. Start with one broad query, then only targeted verification of promising vacancies. Avoid equivalent/repeated queries and never re-search the same domain without a specific reason.
 - Prefer official employer/institution and direct ATS pages. Use job boards/recruiters mainly for discovery, then verify the final vacancy directly whenever possible.
 - Hidden-gem layer: also inspect niche sector boards, boutique/executive recruiters, VC/PE or holding portfolio-company career pages, chambers/associations, accelerator ecosystems, local employer career pages and credible spontaneous-opportunity pages when relevant to the selected mode.
 - Also use credible public employer/founder LinkedIn posts, public company social posts/newsletters and community pages as discovery signals for niche roles. Never return a social post by itself unless it contains a clear current application path and the vacancy can be independently verified.
@@ -554,7 +554,7 @@ FINAL CHECK BEFORE OUTPUT
 - Global: <=30 days and explicit Belgium/EU/Europe/EMEA remote eligibility.
 - SW-MO: <=30 days and realistic Belgian/EU-citizen mobility.
 - PRESTIGE: employer and role must both pass a genuine prestige test: institutional reputation + meaningful responsibility + future career leverage. Ordinary private-company jobs, generic associations and low-impact admin/coordinator roles do not qualify. Candidate is Belgian/EU citizen, age 35; check explicit age/nationality/clearance/status rules.
-- KAPELLEN: final listed workplace must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or Hoevenen. No central Antwerp/Brussels fallback. Search local family offices, owner-led SMEs, premium/creative/property/interior/automotive/marine businesses and strong local employers before generic corporate roles.
+- KAPELLEN: final listed workplace must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or Hoevenen. No central Antwerp/Brussels fallback. Prioritise bespoke interiors, cabinetry/joinery, furniture, interior finishing, decorative surfaces, restoration, ateliers/workshops, classic/performance cars, detailing/restoration, marine/yacht interiors, premium renovation/property services, family businesses and owner-led SMEs. Prefer productive craft-adjacent roles over screen-heavy corporate work.
 - CREATIVE: seek distinctive premium/lifestyle/heritage environments (clubs, yachts, classic/performance cars, tailoring, watches, estates, private aviation, boutique hospitality, wine/spirits, design/interiors). Reject generic retail/hospitality filler and hands-on trade jobs requiring qualifications the candidate lacks.
 - DOGS: final employer must be genuinely dog/pet/animal-sector related; English sufficient; reject mandatory professional Dutch/French and low-skill animal-care filler roles.
 - ${(mode === "search" || mode === "reasonable" || mode === "prestige") ? (mode === "search" ? "Search: cover all Details themes, rank them together and return up to 12 excellent roles." : mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: search all fallback waves and aim for 5-10 credible roles, maximum 10; do not stop after a narrow fintech pass.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
@@ -1477,8 +1477,8 @@ async function startSearch(req, res) {
   const mode = String(body?.mode || "");
   if (!MODES[mode]) return sendJson(res, 400, { error: "Unknown mode." });
 
-  const seenUrls = Array.isArray(body?.seenUrls) ? body.seenUrls.map(String) : [];
-  const candidatePool = Array.isArray(body?.candidatePool) ? body.candidatePool.slice(0,48) : [];
+  const seenUrls = Array.isArray(body?.seenUrls) ? body.seenUrls.map(String).slice(-30) : [];
+  const candidatePool = Array.isArray(body?.candidatePool) ? body.candidatePool.slice(0,16) : [];
   const strictPrompt = buildStrictPrompt(buildPrompt(mode, seenUrls, candidatePool), mode);
 
   try {
@@ -1486,11 +1486,11 @@ async function startSearch(req, res) {
       method: "POST",
       body: JSON.stringify({
         model: OPENAI_MODEL,
-        background: true,
-        store: true,
+        store: false,
+        max_output_tokens: 2600,
         tools: [{
           type: "web_search",
-          search_context_size: "medium",
+          search_context_size: "low",
           user_location: {
             type: "approximate",
             country: "BE",
@@ -1504,19 +1504,25 @@ async function startSearch(req, res) {
       })
     });
 
-    if (!data?.id) {
-      return sendJson(res, 502, { error: "Search service did not return a background response ID." });
-    }
+    const jobs = finalizeJobsFromResponse(data, mode);
+    const webSearchCalls = (data.output || []).filter(item => item?.type === "web_search_call").length;
 
-    return sendJson(res, 202, {
-      searchId: data.id,
+    return sendJson(res, 200, {
       mode,
-      status: data.status || "queued",
-      appVersion: APP_VERSION
+      status: "done",
+      jobs,
+      searchedAt: new Date().toISOString(),
+      appVersion: APP_VERSION,
+      diagnostics: {
+        webSearchCalls,
+        responseId: data.id || null,
+        responseStatus: data.status || "completed",
+        outputTextLength: extractOutputText(data).length
+      }
     });
   } catch (error) {
-    console.error("U-Job start search error:", error);
-    return sendJson(res, 502, { error: error?.message || "Could not start search." });
+    console.error("U-Job direct search error:", error);
+    return sendJson(res, 502, { error: error?.message || "Could not complete search." });
   }
 }
 
