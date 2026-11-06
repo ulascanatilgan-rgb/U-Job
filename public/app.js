@@ -1,7 +1,7 @@
 const MODES={search:{title:"Search",hint:"Best 12 opportunities across every U-Job theme, ranked together."},reasonable:{title:"Reasonable",hint:"Realistic next-step roles across fintech, startups, investment/product, transformation and operations — aiming for 5-10 verified matches."},creative:{title:"Creative",hint:"Interior, renovation, finishing, workshop and hands-on project roles."},dogs:{title:"Dogs",hint:"Dog, pet and animal-sector roles where Hondinn gives you a real edge."},kapellen:{title:"Kapellen",hint:"Strong-fit jobs close to Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten and Ekeren."},corporate:{title:"Corporate",hint:"Banking-focused senior and strategic roles."},startup:{title:"Startup",hint:"High-potential Belgian tech startups and scale-ups, Antwerp first."},familyoffice:{title:"Family O.",hint:"Family offices, family capital, owner offices and boutique investment/operations roles."},investment:{title:"Investment",hint:"Investment, wealth, research and economics roles matching your business + analytics + tech profile."},fintech:{title:"Fintech",hint:"Belgium fintech roles matched to your banking, operations and tech profile."},ai:{title:"AI",hint:"AI, GenAI, transformation, product and operations roles."},linkedin:{title:"LinkedIn",hint:"Best-fit LinkedIn roles posted in the last 7 days."},global:{title:"Global",hint:"Elite international remote roles open to Belgium/Europe."},swmo:{title:"SW-MO",hint:"Strong-fit Switzerland and Monaco roles with English sufficient."},prestige:{title:"Prestige",hint:"Power-track institutions, defence, EU/NATO, policy and international influence — up to 10 verified roles."},highpaid:{title:"High Paid",hint:"Compensation upside, seniority and financial leverage."},turkish:{title:"Turkish",hint:"Belgium roles where Turkish or Turkey-market knowledge is an advantage."}};
-const STORAGE_KEY="ujob:data";const SYNC_MIGRATED_KEY="ujob:sync-migrated-v2-watchlist-import";let syncReady=false;let syncRevision=0;let syncTimer=null;let syncInFlight=false;const SEARCH_TARGET=12;const SEARCH_FILL_MAX_ROUNDS=4;const DETAIL_MIN_TARGET=3;const DETAIL_FILL_MAX_ROUNDS=3;let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;let searchFillRound=0;let searchSessionJobs=[];const detailFillRounds={};const detailSessionJobs={};const msBusy=new Set();const cvBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",familyoffice:"",investment:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,familyoffice:null,investment:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
+const STORAGE_KEY="ujob:data";const SYNC_MIGRATED_KEY="ujob:sync-migrated-v2-watchlist-import";let syncReady=false;let syncRevision=0;let syncTimer=null;let syncInFlight=false;const SEARCH_TARGET=8;const SEARCH_FILL_MAX_ROUNDS=0;const DETAIL_MIN_TARGET=3;const DETAIL_FILL_MAX_ROUNDS=0;let state=loadState();let activeMode="search";let activeView="search";let detailsOpen=false;let searchFillRound=0;let searchSessionJobs=[];const detailFillRounds={};const detailSessionJobs={};const msBusy=new Set();const cvBusy=new Set();let askBusy=false;const modeStatus={search:"",reasonable:"",creative:"",dogs:"",kapellen:"",corporate:"",startup:"",familyoffice:"",investment:"",fintech:"",ai:"",linkedin:"",global:"",swmo:"",prestige:"",highpaid:"",turkish:""};const pollTimers={search:null,reasonable:null,creative:null,dogs:null,kapellen:null,corporate:null,startup:null,familyoffice:null,investment:null,fintech:null,ai:null,linkedin:null,global:null,swmo:null,prestige:null,highpaid:null,turkish:null};
 function detailMinTargetFor(mode){return mode==="reasonable"?5:DETAIL_MIN_TARGET}
-function detailFillMaxRoundsFor(mode){return mode==="reasonable"?5:DETAIL_FILL_MAX_ROUNDS}
+function detailFillMaxRoundsFor(mode){return DETAIL_FILL_MAX_ROUNDS}
 const $=id=>document.getElementById(id);const els={today:$("todayDate"),title:$("sectionTitle"),hint:$("sectionHint"),run:$("runButton"),results:$("results"),status:$("status"),lastUpdate:$("lastUpdate"),history:$("history"),historyWrap:document.querySelector(".history-wrap"),historyToggle:$("historyToggle"),historyCount:$("historyCount"),actionsButton:$("actionsMode"),actionsCount:$("actionsCount"),askButton:$("askButton"),askPanel:$("askPanel"),askClose:$("askClose"),askUrl:$("askUrl"),askRun:$("askRun"),askResult:$("askResult"),askHistory:$("askHistory"),primarySearch:$("primarySearch"),primaryDetails:$("primaryDetails"),detailsPanel:$("detailsPanel"),formatButton:$("formatButton")};
 function blankMode(){return{lastUpdate:null,latest:[],runs:[],pendingSearch:null}}function isBlockedTarget(job){
   const company=String(job?.company||"").trim();
@@ -683,6 +683,7 @@ function schedulePoll(mode, delay=3500){
 function completeModeSearch(mode,data){
   let jobs=Array.isArray(data.jobs)?data.jobs:[];
   const at=data.searchedAt||new Date().toISOString();
+  const previousLatest=Array.isArray(state[mode]?.latest)?state[mode].latest:[];
 
   if(mode==="search"){
     searchSessionJobs=mergeSearchJobs(searchSessionJobs,jobs,collectTodayVerifiedDetailJobs());
@@ -726,10 +727,14 @@ function completeModeSearch(mode,data){
     }
   }
 
+  if(!jobs.length&&previousLatest.length){
+    jobs=previousLatest;
+    modeStatus[mode]="No new verified roles found; showing the last verified matches.";
+  }
   state[mode].latest=jobs;
   state[mode].lastUpdate=at;
   state[mode].pendingSearch=null;
-  state[mode].runs.unshift({
+  if(Array.isArray(data.jobs)&&data.jobs.length)state[mode].runs.unshift({
     at,
     jobs:jobs.map(({whyFit,languageCheck,...small})=>small)
   });
@@ -805,45 +810,51 @@ async function pollSearch(mode){
 }
 
 async function startModeSearch(mode,restarts=0){
-  if(state[mode]?.pendingSearch?.id){
-    schedulePoll(mode,250);
-    return;
-  }
-
-  modeStatus[mode]="Starting background search…";
+  modeStatus[mode]="Searching…";
   if(activeView===mode){
     els.status.textContent=modeStatus[mode];
-    syncRunButton();
+    els.run.disabled=true;
   }
 
   try{
     const response=await apiFetch("/api/search/start",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({mode,seenUrls:seenUrlsForMode(mode),candidatePool:collectCandidatePoolForMode(mode)})
-    },15000);
+      body:JSON.stringify({
+        mode,
+        seenUrls:seenUrlsForMode(mode).slice(-30),
+        candidatePool:collectCandidatePoolForMode(mode).slice(0,16)
+      })
+    },50000);
 
     const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(data.error||"Could not start search.");
+    if(!response.ok)throw new Error(data.error||"Could not complete search.");
 
-    state[mode].pendingSearch={
-      id:data.searchId,
-      startedAt:new Date().toISOString(),
-      restarts
-    };
-    saveState();
+    if(data.status==="done"){
+      completeModeSearch(mode,data);
+      return;
+    }
 
-    modeStatus[mode]="Search is running in background…";
-    if(activeView===mode)render();
-    schedulePoll(mode,1200);
+    if(data.searchId){
+      state[mode].pendingSearch={id:data.searchId,startedAt:new Date().toISOString(),restarts};
+      saveState();
+      modeStatus[mode]="Search is running…";
+      if(activeView===mode)render();
+      schedulePoll(mode,1200);
+      return;
+    }
+
+    throw new Error("Search returned no usable result.");
   }catch(error){
     state[mode].pendingSearch=null;
     saveState();
     const message=error?.name==="AbortError"
-      ?"Could not start search. Please try again."
-      :(error.message||"Could not start search.");
+      ?"Search timed out. Previous verified results are kept."
+      :(error.message||"Could not complete search.");
     modeStatus[mode]=message;
     if(activeView===mode)render();
+  }finally{
+    if(activeView===mode)syncRunButton();
   }
 }
 
@@ -864,7 +875,7 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=58",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=59",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.primarySearch?.addEventListener("click",showSearchHome);
 els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
