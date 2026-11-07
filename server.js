@@ -270,6 +270,7 @@ function cleanJob(job) {
     remoteCheck: String(job?.remoteCheck || "").trim(),
     mobilityCheck: String(job?.mobilityCheck || "").trim(),
     ageCheck: String(job?.ageCheck || "").trim(),
+    modeCheck: String(job?.modeCheck || "").trim(),
     score: Math.round(Math.max(0, Math.min(10, Number(job?.score) || 0)) * 10) / 10,
     whyFit: Array.isArray(job?.whyFit)
       ? job.whyFit.slice(0, 3).map(v => String(v).trim()).filter(Boolean)
