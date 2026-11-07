@@ -183,8 +183,21 @@ function collectTodayVerifiedRelatedJobs(mode){
   }
   return mergeSearchJobs(jobs);
 }
+function isCreativeClientJob(job){
+  const primary=[job?.title,job?.company,job?.modeCheck].join(" ").toLowerCase();
+  const all=[primary,...(Array.isArray(job?.whyFit)?job.whyFit:[])].join(" ").toLowerCase();
+  const physical=/\b(interior|interiors|atelier|workshop|showroom|furniture|cabinet|cabinetry|joinery|carpentry|renovation|restoration|fit[- ]?out|surface|surfaces|finishing|decorative|architecture|architectural|estate|yacht|marine|automotive|classic car|performance car|heritage|boutique hotel|members? club|hospitality|watch|watches|jewel|jewellery|jewelry|tailor|menswear|wine|spirits|golf|equestrian|private aviation|concierge|auction|gallery|art house|events?|lifestyle|craft|artisan|bespoke|property services?)\b/i.test(all);
+  const corporate=/\b(bank|banking|fintech|financial services|financial crime|aml|compliance|internal audit|cybersecurity|identity access|iam|risk management|risk governance|payments?|regulatory|accounting|insurance operations|software consulting|management consulting)\b/i.test(primary);
+  const digitalOnly=/\b(ux|ui|product designer|graphic designer|digital designer|brand marketing|performance marketing|content marketing|social media)\b/i.test(primary)&&!physical;
+  return physical&&!corporate&&!digitalOnly;
+}
+function filterJobsForMode(mode,jobs){
+  jobs=Array.isArray(jobs)?jobs:[];
+  if(mode==="creative")return jobs.filter(isCreativeClientJob);
+  return jobs;
+}
 function mergeDetailJobs(mode,...lists){
-  const all=mergeSearchJobs(...lists);
+  const all=filterJobsForMode(mode,mergeSearchJobs(...lists));
   const floor=(mode==="global"?7.5:mode==="swmo"?7.2:mode==="reasonable"?6.0:6.2);
   return all.filter(job=>Number(job.score||0)>=floor).slice(0,(mode==="reasonable"||mode==="prestige")?10:5);
 }
@@ -300,8 +313,8 @@ function render(){
   els.lastUpdate.textContent=modeState.lastUpdate?`Updated ${fmtDate(modeState.lastUpdate,true)}`:"";
   els.historyCount.textContent=modeState.runs.reduce((sum,run)=>sum+run.jobs.length,0);
   els.status.textContent=modeStatus[activeMode]||"";
-  renderResults(modeState.latest,activeMode);
-  renderHistory(modeState.runs,activeMode);
+  renderResults(filterJobsForMode(activeMode,modeState.latest),activeMode);
+  renderHistory(activeMode==="creative"?modeState.runs.map(run=>({...run,jobs:filterJobsForMode(activeMode,run.jobs)})):modeState.runs,activeMode);
   syncRunButton();
 }
 function renderResults(jobs,mode){
@@ -683,7 +696,7 @@ function schedulePoll(mode, delay=3500){
 function completeModeSearch(mode,data){
   let jobs=Array.isArray(data.jobs)?data.jobs:[];
   const at=data.searchedAt||new Date().toISOString();
-  const previousLatest=Array.isArray(state[mode]?.latest)?state[mode].latest:[];
+  const previousLatest=filterJobsForMode(mode,Array.isArray(state[mode]?.latest)?state[mode].latest:[]);
 
   if(mode==="search"){
     searchSessionJobs=mergeSearchJobs(searchSessionJobs,jobs,collectTodayVerifiedDetailJobs());
@@ -872,7 +885,7 @@ function resumePendingSearches(){
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=60",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=61",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.primarySearch?.addEventListener("click",showSearchHome);
 els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
@@ -896,6 +909,12 @@ window.addEventListener("focus",()=>pullRemoteState().finally(resumePendingSearc
 renderToday();setInterval(renderToday,60000);
 async function initUJob(){
   await bootstrapSync();
+  if(state.creative){
+    state.creative.latest=filterJobsForMode("creative",state.creative.latest);
+    state.creative.runs=(state.creative.runs||[]).map(run=>({...run,jobs:filterJobsForMode("creative",run.jobs)})).filter(run=>run.jobs.length);
+    syncLocalCache();
+    if(syncReady)scheduleRemoteSave(50);
+  }
   activeMode="search";
   activeView="search";
   state.activeMode="search";
