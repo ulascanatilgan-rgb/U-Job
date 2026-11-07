@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "5.2.0-fast-details";
+const APP_VERSION = "5.3.0-creative-purity";
 const SYNC_FILE = process.env.UJOB_DATA_FILE || path.join(__dirname, "ujob-data.json");
 let syncWriteQueue = Promise.resolve();
 
@@ -556,7 +556,7 @@ FINAL CHECK BEFORE OUTPUT
 - SW-MO: <=30 days and realistic Belgian/EU-citizen mobility.
 - PRESTIGE: employer and role must both pass a genuine prestige test: institutional reputation + meaningful responsibility + future career leverage. Ordinary private-company jobs, generic associations and low-impact admin/coordinator roles do not qualify. Candidate is Belgian/EU citizen, age 35; check explicit age/nationality/clearance/status rules.
 - KAPELLEN: final listed workplace must be Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or Hoevenen. No central Antwerp/Brussels fallback. Prioritise bespoke interiors, cabinetry/joinery, furniture, interior finishing, decorative surfaces, restoration, ateliers/workshops, classic/performance cars, detailing/restoration, marine/yacht interiors, premium renovation/property services, family businesses and owner-led SMEs. Prefer productive craft-adjacent roles over screen-heavy corporate work.
-- CREATIVE: seek distinctive premium/lifestyle/heritage environments (clubs, yachts, classic/performance cars, tailoring, watches, estates, private aviation, boutique hospitality, wine/spirits, design/interiors). Reject generic retail/hospitality filler and hands-on trade jobs requiring qualifications the candidate lacks.
+- CREATIVE: every accepted vacancy must belong to a genuinely creative/lifestyle/craft/premium environment: interiors/design/renovation/atelier/workshop/furniture/architecture/property/yacht/marine/classic-performance automotive/luxury/heritage/private clubs/boutique hospitality/art/events/estate/concierge. Reject banking, fintech, audit, compliance, IAM, risk, generic consulting and ordinary corporate operations even when the role title is Operations/Project Manager.
 - DOGS: final employer must be genuinely dog/pet/animal-sector related; English sufficient; reject mandatory professional Dutch/French and low-skill animal-care filler roles.
 - ${(mode === "search" || mode === "reasonable" || mode === "prestige") ? (mode === "search" ? "Search: cover all Details themes, rank them together and return up to 12 excellent roles." : mode === "prestige" ? "Prestige: aim for 6-10 excellent institutional roles, maximum 10." : "Reasonable: search all fallback waves and aim for 5-10 credible roles, maximum 10; do not stop after a narrow fintech pass.") : "Aim for 3-5 excellent roles, maximum 5."} Never pad with weak/stale roles.
 - Do not output rejected roles or commentary.`;
@@ -649,6 +649,29 @@ function hasNoHardExperienceGap(job) {
   return positive && !blocked;
 }
 
+function isCreativeCategoryJob(job){
+  const text=[
+    job?.title,job?.company,job?.location,job?.modeCheck,
+    ...(Array.isArray(job?.whyFit)?job.whyFit:[])
+  ].join(" ").toLowerCase();
+
+  const creativeSignal=/\b(interior|interiors|design|designer|atelier|workshop|showroom|furniture|cabinet|cabinetry|joinery|carpentry|renovation|restoration|fit[- ]?out|surface|finishing|decorative|architecture|architectural|property|estate|yacht|marine|automotive|classic car|performance car|luxury|premium|heritage|hospitality|hotel|club|membership|watch|jewel|tailor|menswear|wine|spirits|golf|equestrian|aviation|concierge|auction|art|gallery|events?|lifestyle|craft|artisan|bespoke)\b/i.test(text);
+  const corporateOnly=/\b(bank|banking|financial crime|aml|compliance|audit|cybersecurity|identity access|iam|risk governance|payments?|regulatory|accounting)\b/i.test(text)
+    && !creativeSignal;
+  return creativeSignal && !corporateOnly;
+}
+
+function isCorporateCategoryJob(job){
+  const text=[job?.title,job?.company,job?.modeCheck,...(Array.isArray(job?.whyFit)?job.whyFit:[])].join(" ").toLowerCase();
+  return /\b(bank|banking|financial services|payments?|fintech|risk|controls?|audit|security governance|transformation|investment operations|product operations|financial crime|compliance)\b/i.test(text);
+}
+
+function passesModeSemanticGuard(job,mode){
+  if(mode==="creative")return isCreativeCategoryJob(job);
+  if(mode==="corporate")return isCorporateCategoryJob(job);
+  return true;
+}
+
 function finalizeJobsFromResponse(data, mode = "") {
   const outputText = extractOutputText(data);
   if (!outputText) return [];
@@ -671,6 +694,7 @@ function finalizeJobsFromResponse(data, mode = "") {
     .filter(job => mode !== "global" || hasVerifiedEuropeRemote(job))
     .filter(job => mode !== "swmo" || hasRealisticSwmoMobility(job))
     .filter(job => mode !== "kapellen" || isKapellenArea(job))
+    .filter(job => passesModeSemanticGuard(job,mode))
     .filter(job => {
       if (!mode || mode === "search") return true;
       const expected = mode.toUpperCase().replace(/[^A-Z0-9]+/g,"_")+"_MATCH";
@@ -1485,7 +1509,7 @@ function buildFastSearchPrompt(mode, seenUrls = []) {
     : mode==="corporate"
       ? "STRICT CORPORATE: banking/financial-services roles only; senior operations, transformation, programme/project, payments, risk/security governance, controls or investment/product operations."
     : mode==="creative"
-      ? "STRICT CREATIVE: premium design/interior/renovation/atelier/luxury/heritage/automotive/marine/property environments; avoid generic retail and low-skill hospitality."
+      ? "STRICT CREATIVE: every result MUST have a clear creative/lifestyle/craft sector signal in the actual employer or vacancy: interior/design/renovation/atelier/workshop/furniture/architecture/property/yacht/marine/classic or premium automotive/luxury/heritage/club/hospitality/art/events/estate/concierge. Reject banks, fintech, audit, compliance, IAM, risk, generic consulting and ordinary corporate operations even if the transferable skills fit."
     : mode==="familyoffice"
       ? "STRICT FAMILY OFFICE: actual family office, family investment/holding, owner office, wealth/investment boutique or family-controlled group."
     : mode==="fintech"
@@ -1553,7 +1577,11 @@ async function fallbackJobsForMode(mode){
   try{
     const store=await readSyncStore();
     const latest=store?.state?.[mode]?.latest;
-    return Array.isArray(latest)?latest.slice(0,mode==="search"?5:3):[];
+    if(!Array.isArray(latest))return [];
+    return latest
+      .map(cleanJob)
+      .filter(job=>passesModeSemanticGuard(job,mode))
+      .slice(0,mode==="search"?5:3);
   }catch{
     return [];
   }
