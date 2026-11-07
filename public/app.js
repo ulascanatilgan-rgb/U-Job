@@ -742,12 +742,16 @@ function completeModeSearch(mode,data){
   saveState();
   clearPoll(mode);
 
-  const targetMax=mode==="search"?SEARCH_TARGET:(mode==="reasonable"||mode==="prestige")?10:5;
-  modeStatus[mode]=jobs.length===targetMax
-    ?String(targetMax)+" verified matches."
-    :jobs.length>0
-      ?String(jobs.length)+" verified matches found after full search expansion."
-      :(mode==="search"?"Search expansion completed without enough verified roles.":mode==="reasonable"?"Reasonable exhausted all expanded waves; no current role passed the hard eligibility filters.":"Full expanded search completed; no role passed every hard filter.");
+  const targetMax=mode==="search"?SEARCH_TARGET:3;
+  if(data.cached){
+    modeStatus[mode]=jobs.length
+      ?"Fresh search hit the time limit — showing "+jobs.length+" last verified match"+(jobs.length===1?"":"es")+"."
+      :"No verified result available yet.";
+  }else{
+    modeStatus[mode]=jobs.length
+      ?String(jobs.length)+" verified match"+(jobs.length===1?"":"es")+"."
+      :"No current role passed the filters.";
+  }
 
   if(activeView===mode)render();
 }
@@ -822,25 +826,15 @@ async function startModeSearch(mode,restarts=0){
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         mode,
-        seenUrls:seenUrlsForMode(mode).slice(-30),
-        candidatePool:collectCandidatePoolForMode(mode).slice(0,16)
+        seenUrls:seenUrlsForMode(mode).slice(-20)
       })
-    },50000);
+    },25000);
 
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||"Could not complete search.");
 
     if(data.status==="done"){
       completeModeSearch(mode,data);
-      return;
-    }
-
-    if(data.searchId){
-      state[mode].pendingSearch={id:data.searchId,startedAt:new Date().toISOString(),restarts};
-      saveState();
-      modeStatus[mode]="Search is running…";
-      if(activeView===mode)render();
-      schedulePoll(mode,1200);
       return;
     }
 
@@ -866,16 +860,19 @@ async function runSearch(){
 }
 
 function resumePendingSearches(){
+  let changed=false;
   for(const mode of Object.keys(MODES)){
-    if(state[mode]?.pendingSearch?.id){
-      modeStatus[mode]="Search is running in background…";
-      schedulePoll(mode,300);
+    clearPoll(mode);
+    if(state[mode]?.pendingSearch){
+      state[mode].pendingSearch=null;
+      changed=true;
     }
   }
+  if(changed)saveState();
   render();
 }
 
-async function checkHealth(){try{const r=await fetch("/api/health?fresh=59",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
+async function checkHealth(){try{const r=await fetch("/api/health?fresh=60",{cache:"no-store"});const h=await r.json();if(!h.configured)els.status.textContent="Add OPENAI_API_KEY in Railway Variables."}catch{els.status.textContent="Server connection problem."}}
 document.querySelectorAll(".mode").forEach(btn=>btn.addEventListener("click",()=>setMode(btn.dataset.mode)));
 els.primarySearch?.addEventListener("click",showSearchHome);
 els.primaryDetails?.addEventListener("click",()=>setDetailsOpen(!detailsOpen));
