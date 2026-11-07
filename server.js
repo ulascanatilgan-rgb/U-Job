@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "5.3.0-creative-purity";
+const APP_VERSION = "5.3.1-creative-hard-filter";
 const SYNC_FILE = process.env.UJOB_DATA_FILE || path.join(__dirname, "ujob-data.json");
 let syncWriteQueue = Promise.resolve();
 
@@ -650,15 +650,17 @@ function hasNoHardExperienceGap(job) {
 }
 
 function isCreativeCategoryJob(job){
-  const text=[
-    job?.title,job?.company,job?.location,job?.modeCheck,
-    ...(Array.isArray(job?.whyFit)?job.whyFit:[])
-  ].join(" ").toLowerCase();
+  const primary=[job?.title,job?.company,job?.modeCheck].join(" ").toLowerCase();
+  const all=[primary,...(Array.isArray(job?.whyFit)?job.whyFit:[])].join(" ").toLowerCase();
 
-  const creativeSignal=/\b(interior|interiors|design|designer|atelier|workshop|showroom|furniture|cabinet|cabinetry|joinery|carpentry|renovation|restoration|fit[- ]?out|surface|finishing|decorative|architecture|architectural|property|estate|yacht|marine|automotive|classic car|performance car|luxury|premium|heritage|hospitality|hotel|club|membership|watch|jewel|tailor|menswear|wine|spirits|golf|equestrian|aviation|concierge|auction|art|gallery|events?|lifestyle|craft|artisan|bespoke)\b/i.test(text);
-  const corporateOnly=/\b(bank|banking|financial crime|aml|compliance|audit|cybersecurity|identity access|iam|risk governance|payments?|regulatory|accounting)\b/i.test(text)
-    && !creativeSignal;
-  return creativeSignal && !corporateOnly;
+  const physicalCreative=/\b(interior|interiors|atelier|workshop|showroom|furniture|cabinet|cabinetry|joinery|carpentry|renovation|restoration|fit[- ]?out|surface|surfaces|finishing|decorative|architecture|architectural|estate|yacht|marine|automotive|classic car|performance car|heritage|boutique hotel|members? club|hospitality|watch|watches|jewel|jewellery|jewelry|tailor|menswear|wine|spirits|golf|equestrian|private aviation|concierge|auction|gallery|art house|events?|lifestyle|craft|artisan|bespoke|property services?)\b/i.test(all);
+
+  const corporateSector=/\b(bank|banking|fintech|financial services|financial crime|aml|compliance|internal audit|cybersecurity|identity access|iam|risk management|risk governance|payments?|regulatory|accounting|insurance operations|software consulting|management consulting)\b/i.test(primary);
+
+  const digitalCreativeOnly=/\b(ux|ui|product designer|graphic designer|digital designer|brand marketing|performance marketing|content marketing|social media)\b/i.test(primary)
+    && !physicalCreative;
+
+  return physicalCreative && !corporateSector && !digitalCreativeOnly;
 }
 
 function isCorporateCategoryJob(job){
