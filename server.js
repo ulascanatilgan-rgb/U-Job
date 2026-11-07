@@ -10,7 +10,7 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const PORT = Number(process.env.PORT || 3000);
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = "gpt-5.6-luna";
-const APP_VERSION = "5.1.0-fast-efficient-search";
+const APP_VERSION = "5.2.0-fast-details";
 const SYNC_FILE = process.env.UJOB_DATA_FILE || path.join(__dirname, "ujob-data.json");
 let syncWriteQueue = Promise.resolve();
 
@@ -1469,61 +1469,162 @@ async function openAIRequest(url, options = {}) {
   return data;
 }
 
+function buildFastSearchPrompt(mode, seenUrls = []) {
+  const cfg=MODES[mode];
+  const today=new Intl.DateTimeFormat("en-CA",{
+    timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"
+  }).format(new Date());
+  const count=mode==="search"?5:3;
+  const seen=seenUrls.slice(-20).map(normalizeUrl).filter(Boolean);
+
+  const modeRule=
+    mode==="kapellen"
+      ? "STRICT LOCAL: only Kapellen, Brasschaat, Kalmthout, Stabroek, Schoten, Ekeren or Hoevenen. Prioritise premium artisan/atelier, bespoke interiors, cabinetry/joinery, furniture, restoration, decorative surfaces, classic/performance-car workshop, marine/yacht interiors, premium renovation/property, family business and owner-led SME roles. English must be sufficient."
+    : mode==="prestige"
+      ? "STRICT PRESTIGE: only high-reputation institutional/policy/defence/international-organisation roles with meaningful responsibility and career leverage. Ordinary private-company jobs do not qualify."
+    : mode==="corporate"
+      ? "STRICT CORPORATE: banking/financial-services roles only; senior operations, transformation, programme/project, payments, risk/security governance, controls or investment/product operations."
+    : mode==="creative"
+      ? "STRICT CREATIVE: premium design/interior/renovation/atelier/luxury/heritage/automotive/marine/property environments; avoid generic retail and low-skill hospitality."
+    : mode==="familyoffice"
+      ? "STRICT FAMILY OFFICE: actual family office, family investment/holding, owner office, wealth/investment boutique or family-controlled group."
+    : mode==="fintech"
+      ? "STRICT FINTECH: actual fintech/payments/digital banking/regtech/insurtech/wealth-tech/financial infrastructure employer."
+    : mode==="startup"
+      ? "STRICT STARTUP: genuine high-growth technology startup/scale-up with English-sufficient role."
+    : mode==="investment"
+      ? "STRICT INVESTMENT: investment/wealth/markets/product/research/data/operations bridge role that does not require years of direct front-office experience."
+    : mode==="dogs"
+      ? "STRICT DOGS: genuine dog/pet/animal-sector employer; operational/commercial role, not low-skill kennel work."
+    : mode==="global"
+      ? "STRICT GLOBAL: remote role explicitly open to Belgium/EU/Europe/EMEA."
+    : mode==="swmo"
+      ? "STRICT SW-MO: Switzerland or Monaco only; English sufficient and realistic Belgian/EU mobility."
+    : mode==="linkedin"
+      ? "STRICT LINKEDIN: LinkedIn vacancy only, posted within the last 7 days."
+    : mode==="reasonable"
+      ? "REALISTIC MATCH: strong next-step business/operations/fintech/startup/investment/product/transformation role with no hard experience gap."
+    : "MASTER SEARCH: strongest realistic roles across U-Job themes.";
+
+  return `Find exactly the best CURRENT vacancies for this candidate using live web search.
+
+TODAY: ${today}
+MODE: ${cfg.label}
+CANDIDATE: Kapellen-based Belgian/EU citizen, fluent English, 12+ years banking/fintech/audit/control/IAM/IT-risk, strong operations/project/stakeholder management, MSc IT, entrepreneur with Hondinn and USTO/interior-finishing experience.
+GEOGRAPHY: ${cfg.geography}
+MODE RULE: ${modeRule}
+
+FAST SEARCH RULES
+- Return up to ${count} roles only.
+- Use at most 2 web-search tool calls total.
+- One discovery query, then one verification query/page check for the best candidates. Do not browse further.
+- Prefer current direct employer/ATS vacancies. Reject stale/closed roles.
+- Reject ING vacancies.
+- English must be sufficient; mandatory professional Dutch/French rejects.
+- No hard must-have experience gap.
+- Do not repeat these previously seen URLs: ${seen.length?seen.join(" | "):"none"}.
+- Quality and category fit matter more than filling the quota.
+- Keep explanations very short.
+
+OUTPUT plain text only. For each role:
+---JOB---
+VERIFIED_OPEN: YES
+TITLE: ...
+COMPANY: ...
+LOCATION: ...
+DIRECT_URL: https://...
+PUBLISHED_DATE: YYYY-MM-DD
+OPEN_CHECK: CURRENTLY_OPEN ${today} | application path verified
+MATCH_CHECK: NO_HARD_GAP | brief reason
+LANGUAGE_CHECK: English sufficient; no mandatory Dutch/French
+AGE_CHECK: ${mode==="prestige"?"eligible at age 35":"N/A"}
+REMOTE_CHECK: ${mode==="global"?"Belgium/EU/Europe/EMEA eligible":"N/A"}
+MOBILITY_CHECK: ${mode==="swmo"?"Belgian/EU mobility realistic":"N/A"}
+MODE_CHECK: ${mode.toUpperCase().replace(/[^A-Z0-9]+/g,"_")}_MATCH | brief category reason
+SCORE: 8.2
+WHY_FIT_1: ...
+WHY_FIT_2: ...
+WHY_FIT_3: ...
+
+If none are verified, output NO_VERIFIED_JOBS.`;
+}
+
+async function fallbackJobsForMode(mode){
+  try{
+    const store=await readSyncStore();
+    const latest=store?.state?.[mode]?.latest;
+    return Array.isArray(latest)?latest.slice(0,mode==="search"?5:3):[];
+  }catch{
+    return [];
+  }
+}
+
 async function startSearch(req, res) {
   if (!OPENAI_API_KEY) {
     return sendJson(res, 503, { error: "OPENAI_API_KEY is not configured in Railway." });
   }
 
-  const body = await readJson(req);
-  const mode = String(body?.mode || "");
-  if (!MODES[mode]) return sendJson(res, 400, { error: "Unknown mode." });
+  const body=await readJson(req);
+  const mode=String(body?.mode||"");
+  if(!MODES[mode])return sendJson(res,400,{error:"Unknown mode."});
 
-  const seenUrls = Array.isArray(body?.seenUrls) ? body.seenUrls.map(String).slice(-30) : [];
-  const candidatePool = Array.isArray(body?.candidatePool) ? body.candidatePool.slice(0,16) : [];
-  const strictPrompt = buildStrictPrompt(buildPrompt(mode, seenUrls, candidatePool), mode);
+  const seenUrls=Array.isArray(body?.seenUrls)?body.seenUrls.map(String).slice(-20):[];
+  const prompt=buildFastSearchPrompt(mode,seenUrls);
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),20000);
 
-  try {
-    const data = await openAIRequest("https://api.openai.com/v1/responses", {
-      method: "POST",
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        store: false,
-        max_output_tokens: 2600,
-        tools: [{
-          type: "web_search",
-          search_context_size: "low",
-          user_location: {
-            type: "approximate",
-            country: "BE",
-            city: "Antwerp",
-            region: "Flanders",
-            timezone: "Europe/Brussels"
+  try{
+    const data=await openAIRequest("https://api.openai.com/v1/responses",{
+      method:"POST",
+      signal:controller.signal,
+      body:JSON.stringify({
+        model:OPENAI_MODEL,
+        store:false,
+        max_output_tokens:1600,
+        max_tool_calls:2,
+        tools:[{
+          type:"web_search",
+          search_context_size:"low",
+          user_location:{
+            type:"approximate",
+            country:"BE",
+            city:"Antwerp",
+            region:"Flanders",
+            timezone:"Europe/Brussels"
           }
         }],
-        tool_choice: "required",
-        input: strictPrompt
+        tool_choice:"required",
+        input:prompt
       })
     });
 
-    const jobs = finalizeJobsFromResponse(data, mode);
-    const webSearchCalls = (data.output || []).filter(item => item?.type === "web_search_call").length;
-
-    return sendJson(res, 200, {
+    const jobs=finalizeJobsFromResponse(data,mode);
+    const fallback=jobs.length?[]:await fallbackJobsForMode(mode);
+    return sendJson(res,200,{
       mode,
-      status: "done",
-      jobs,
-      searchedAt: new Date().toISOString(),
-      appVersion: APP_VERSION,
-      diagnostics: {
-        webSearchCalls,
-        responseId: data.id || null,
-        responseStatus: data.status || "completed",
-        outputTextLength: extractOutputText(data).length
-      }
+      status:"done",
+      jobs:jobs.length?jobs:fallback,
+      cached:!jobs.length&&fallback.length>0,
+      searchedAt:new Date().toISOString(),
+      appVersion:APP_VERSION
     });
-  } catch (error) {
-    console.error("U-Job direct search error:", error);
-    return sendJson(res, 502, { error: error?.message || "Could not complete search." });
+  }catch(error){
+    const fallback=await fallbackJobsForMode(mode);
+    if(fallback.length){
+      return sendJson(res,200,{
+        mode,
+        status:"done",
+        jobs:fallback,
+        cached:true,
+        searchedAt:new Date().toISOString(),
+        appVersion:APP_VERSION,
+        note:error?.name==="AbortError"?"Fast search timed out; showing last verified results.":"Fresh search unavailable; showing last verified results."
+      });
+    }
+    console.error("U-Job fast search error:",error);
+    return sendJson(res,502,{error:error?.name==="AbortError"?"Search timed out. Try once more.":(error?.message||"Could not complete search.")});
+  }finally{
+    clearTimeout(timeout);
   }
 }
 
